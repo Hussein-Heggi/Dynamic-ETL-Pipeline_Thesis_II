@@ -6,9 +6,9 @@ import pandas as pd
 from typing import List, Tuple, Dict, Optional
 import logging
 
-from .config import ValidatorConfig
-from .union import UnionEngine
-from .join import JoinEngine
+from config import ValidatorConfig
+from union import UnionEngine
+from join import JoinEngine
 
 
 class Validator:
@@ -26,8 +26,10 @@ class Validator:
         1. Validate input
         2. UNION stage (sequential column matching)
         3. Check for early termination (all unioned)
-        4. JOIN stage (2-stage row matching)
-        5. Return results + detailed report
+        4. JOIN stage 1 (pairwise row matching)
+        5. CHECK: Skip Stage 2 if no joins succeeded in Stage 1
+        6. JOIN stage 2 (join the joined groups)
+        7. Return results + detailed report
     """
     
     def __init__(self, config: Optional[ValidatorConfig] = None):
@@ -120,11 +122,21 @@ class Validator:
             1. Validate input
             2. UNION stage (sequential)
             3. Early termination check
-            4. JOIN stage (2-stage)
-            5. Generate report
+            4. JOIN stage 1 (pairwise)
+            5. CHECK: Skip Stage 2 if no Stage 1 joins succeeded
+            6. JOIN stage 2 (join the joined)
+            7. Generate report
         """
         # 1. Validate input
         self._validate_input(dataframes)
+        
+        print("\n" + "=" * 70)
+        print("VALIDATOR PIPELINE STARTED")
+        print("=" * 70)
+        print(f"\nInput: {len(dataframes)} dataframes")
+        for i, df in enumerate(dataframes):
+            print(f"  DF{i}: {df.shape[0]} rows × {df.shape[1]} columns")
+            print(f"       Columns: {list(df.columns)[:5]}{' ...' if len(df.columns) > 5 else ''}")
         
         self.logger.info("=" * 60)
         self.logger.info(f"VALIDATOR PIPELINE STARTED")
@@ -138,13 +150,19 @@ class Validator:
             'input_count': len(dataframes),
             'input_shapes': [df.shape for df in dataframes],
             'union_operations': [],
-            'join_operations': [],
+            'join_operations': {},
             'early_termination': False,
+            'stage_2_skipped': False,
             'output_count': 0,
             'output_shapes': []
         }
         
         # 2. UNION STAGE
+        print("\n" + "=" * 70)
+        print("STAGE 1: UNION (Vertical Concatenation - Similar Columns)")
+        print("=" * 70)
+        print("\nAttempting to stack dataframes with similar column structures...")
+        
         self.logger.info("")
         self.logger.info("=" * 60)
         self.logger.info("UNION STAGE")
@@ -153,12 +171,23 @@ class Validator:
         unioned_dfs, union_ops = self.union_engine.process(dataframes)
         report['union_operations'] = union_ops
         
+        print(f"\nUNION RESULT: {len(dataframes)} dataframes → {len(unioned_dfs)} groups")
+        for i, df in enumerate(unioned_dfs):
+            print(f"  Group{i}: {df.shape[0]} rows × {df.shape[1]} columns")
+        
         self.logger.info(f"UNION complete: {len(dataframes)} → {len(unioned_dfs)} dataframes")
         for i, df in enumerate(unioned_dfs):
             self.logger.info(f"  Group{i}: {df.shape}")
         
         # 3. Early termination check
         if len(unioned_dfs) == 1:
+            print("\n" + "=" * 70)
+            print("EARLY TERMINATION")
+            print("=" * 70)
+            print("\n✓ All dataframes successfully unioned into one!")
+            print(f"  Final output: {unioned_dfs[0].shape[0]} rows × {unioned_dfs[0].shape[1]} columns")
+            print("\n  Skipping JOIN stage (not needed)")
+            
             self.logger.info("")
             self.logger.info("=" * 60)
             self.logger.info("EARLY TERMINATION: All dataframes successfully unioned")
@@ -168,9 +197,18 @@ class Validator:
             report['output_count'] = 1
             report['output_shapes'] = [unioned_dfs[0].shape]
             
+            print("\n" + "=" * 70)
+            print("VALIDATOR PIPELINE COMPLETE")
+            print("=" * 70)
+            
             return unioned_dfs, report
         
-        # 4. JOIN STAGE
+        # 4. JOIN STAGE 1
+        print("\n" + "=" * 70)
+        print("STAGE 2: JOIN (Horizontal Concatenation - Compatible Rows)")
+        print("=" * 70)
+        print(f"\n{len(unioned_dfs)} groups remaining after union - attempting to join...")
+        
         self.logger.info("")
         self.logger.info("=" * 60)
         self.logger.info("JOIN STAGE")
@@ -178,21 +216,73 @@ class Validator:
         
         # Calculate denominator (fixed for all join operations)
         denominator = min(df.shape[0] for df in unioned_dfs)
+        print(f"\nJoin denominator (minimum row count): {denominator} rows")
+        print("(Retention = unique_row_coverage / {})".format(denominator))
+        
         self.logger.info(f"Join denominator: {denominator} rows")
         
         # Stage 1: Initial pairwise joins
+        print("\n" + "-" * 70)
+        print("JOIN STAGE 1: Initial Pairwise Joins")
+        print("-" * 70)
+        print("\nFinding best join partner for each group...")
+        
         self.logger.info("")
         self.logger.info("-" * 60)
         self.logger.info("JOIN STAGE 1: Initial Pairwise Joins")
         self.logger.info("-" * 60)
         
-        stage1_dfs, stage1_ops = self.join_engine.stage_1(unioned_dfs, denominator)
+        stage1_dfs, stage1_ops, stage1_success = self.join_engine.stage_1(unioned_dfs, denominator)
+        
+        print(f"\nSTAGE 1 RESULT: {len(unioned_dfs)} groups → {len(stage1_dfs)} groups")
+        for i, df in enumerate(stage1_dfs):
+            print(f"  Result{i}: {df.shape[0]} rows × {df.shape[1]} columns")
         
         self.logger.info(f"Stage 1 complete: {len(unioned_dfs)} → {len(stage1_dfs)} dataframes")
         for i, df in enumerate(stage1_dfs):
             self.logger.info(f"  Result{i}: {df.shape}")
         
-        # Stage 2: Join the joined groups
+        report['join_operations']['stage_1'] = stage1_ops
+        
+        # 5. CHECK: Skip Stage 2 if no joins succeeded in Stage 1
+        if not stage1_success:
+            print("\n" + "=" * 70)
+            print("SKIPPING JOIN STAGE 2")
+            print("=" * 70)
+            print("\n✗ No compatible joins found in Stage 1")
+            print("  All groups are incompatible with each other")
+            print("  Stage 2 would not find any matches either")
+            print("\n  Returning Stage 1 outputs as final results")
+            
+            self.logger.info("")
+            self.logger.info("=" * 60)
+            self.logger.info("SKIPPING STAGE 2: No joins succeeded in Stage 1")
+            self.logger.info("=" * 60)
+            
+            report['join_operations']['stage_2'] = []
+            report['stage_2_skipped'] = True
+            report['output_count'] = len(stage1_dfs)
+            report['output_shapes'] = [df.shape for df in stage1_dfs]
+            
+            print("\n" + "=" * 70)
+            print("VALIDATOR PIPELINE COMPLETE")
+            print("=" * 70)
+            print(f"\nFinal Summary:")
+            print(f"  Input:  {len(dataframes)} dataframes")
+            print(f"  Output: {len(stage1_dfs)} dataframe(s)")
+            print()
+            for i, df in enumerate(stage1_dfs):
+                print(f"  Output {i}: {df.shape[0]} rows × {df.shape[1]} columns")
+            print("\n" + "=" * 70 + "\n")
+            
+            return stage1_dfs, report
+        
+        # 6. Stage 2: Join the joined groups
+        print("\n" + "-" * 70)
+        print("JOIN STAGE 2: Join the Joined Groups")
+        print("-" * 70)
+        print("\nAttempting to combine Stage 1 results...")
+        
         self.logger.info("")
         self.logger.info("-" * 60)
         self.logger.info("JOIN STAGE 2: Join the Joined Groups")
@@ -200,19 +290,32 @@ class Validator:
         
         final_dfs, stage2_ops = self.join_engine.stage_2(stage1_dfs, denominator)
         
+        print(f"\nSTAGE 2 RESULT: {len(stage1_dfs)} groups → {len(final_dfs)} final groups")
+        for i, df in enumerate(final_dfs):
+            print(f"  Final{i}: {df.shape[0]} rows × {df.shape[1]} columns")
+        
         self.logger.info(f"Stage 2 complete: {len(stage1_dfs)} → {len(final_dfs)} dataframes")
         for i, df in enumerate(final_dfs):
             self.logger.info(f"  Final{i}: {df.shape}")
         
         # Update report
-        report['join_operations'] = {
-            'stage_1': stage1_ops,
-            'stage_2': stage2_ops
-        }
+        report['join_operations']['stage_2'] = stage2_ops
+        report['stage_2_skipped'] = False
         
-        # 5. Finalize report
+        # 7. Finalize report
         report['output_count'] = len(final_dfs)
         report['output_shapes'] = [df.shape for df in final_dfs]
+        
+        print("\n" + "=" * 70)
+        print("VALIDATOR PIPELINE COMPLETE")
+        print("=" * 70)
+        print(f"\nFinal Summary:")
+        print(f"  Input:  {len(dataframes)} dataframes")
+        print(f"  Output: {len(final_dfs)} dataframe(s)")
+        print()
+        for i, df in enumerate(final_dfs):
+            print(f"  Output {i}: {df.shape[0]} rows × {df.shape[1]} columns")
+        print("\n" + "=" * 70 + "\n")
         
         self.logger.info("")
         self.logger.info("=" * 60)
@@ -260,14 +363,21 @@ class Validator:
             
             lines.append(f"\nJoin Stage 1: {len(join_ops['stage_1'])} operations")
             for op in join_ops['stage_1']:
-                lines.append(f"  - DFs {op['dataframes']}: retention={op['retention']:.3f}, "
-                           f"matched={op['matched_rows']}, result={op['result_shape']}")
+                if op['compatible']:
+                    lines.append(f"  - DFs {op['dataframes']}: retention={op['retention']:.3f}, "
+                               f"matched={op['matched_rows']}, result={op['result_shape']}")
+                else:
+                    lines.append(f"  - DF {op['dataframes'][0]}: no compatible partner")
             
-            lines.append(f"\nJoin Stage 2: {len(join_ops['stage_2'])} operations")
-            for op in join_ops['stage_2']:
-                lines.append(f"  - DFs {op['dataframes']}: retention={op['retention']:.3f}, "
-                           f"matched={op['matched_rows']}, result={op['result_shape']}, "
-                           f"combination={op['combination']}")
+            # Stage 2
+            if report.get('stage_2_skipped', False):
+                lines.append(f"\nJoin Stage 2: SKIPPED (no Stage 1 joins succeeded)")
+            else:
+                lines.append(f"\nJoin Stage 2: {len(join_ops['stage_2'])} operations")
+                for op in join_ops['stage_2']:
+                    lines.append(f"  - DFs {op['dataframes']}: retention={op['retention']:.3f}, "
+                               f"matched={op['matched_rows']}, result={op['result_shape']}, "
+                               f"combination={op['combination']}")
         
         # Output
         lines.append(f"\nOutput: {report['output_count']} dataframe(s)")
@@ -277,3 +387,65 @@ class Validator:
         lines.append("=" * 60)
         
         return "\n".join(lines)
+    
+    def save_outputs(
+        self,
+        dataframes: List[pd.DataFrame],
+        output_dir: str = "outputs",
+        prefix: str = "output"
+    ) -> List[str]:
+        """
+        Save output dataframes to CSV files
+        
+        Args:
+            dataframes: List of output DataFrames to save
+            output_dir: Directory to save files (default: "outputs")
+            prefix: Prefix for filenames (default: "output")
+        
+        Returns:
+            List of saved file paths
+        
+        Creates files like:
+            outputs/output_0.csv
+            outputs/output_1.csv
+            ...
+        """
+        from pathlib import Path
+
+        # Create output directory if it doesn't exist
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        saved_files = []
+        
+        print("\n" + "=" * 70)
+        print("SAVING OUTPUTS TO CSV")
+        print("=" * 70)
+        print(f"\nOutput directory: {output_path.absolute()}")
+        
+        for i, df in enumerate(dataframes):
+            # Generate filename
+            filename = f"{prefix}_{i}.csv"
+            filepath = output_path / filename
+            
+            # Save to CSV
+            try:
+                df.to_csv(filepath, index=False)
+                saved_files.append(str(filepath))
+                
+                print(f"\n  ✓ Saved output {i}:")
+                print(f"    File: {filename}")
+                print(f"    Path: {filepath.absolute()}")
+                print(f"    Size: {df.shape[0]} rows × {df.shape[1]} columns")
+                
+                self.logger.info(f"Saved output {i} to {filepath}")
+                
+            except Exception as e:
+                print(f"\n  ✗ Failed to save output {i}: {e}")
+                self.logger.error(f"Failed to save output {i}: {e}")
+        
+        print(f"\n{'=' * 70}")
+        print(f"SAVED {len(saved_files)}/{len(dataframes)} FILES")
+        print(f"{'=' * 70}\n")
+        
+        return saved_files

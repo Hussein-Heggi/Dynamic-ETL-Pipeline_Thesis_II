@@ -12,7 +12,8 @@ from difflib import SequenceMatcher
 import torch
 from transformers import AutoTokenizer, AutoModel
 
-from .config import ValidatorConfig
+from config import ValidatorConfig
+
 
 
 class UnionEngine:
@@ -181,15 +182,35 @@ class UnionEngine:
         cols_a = df1.columns.tolist()
         cols_b = df2.columns.tolist()
         
+        print(f"  → DF1: {len(cols_a)} columns")
+        print(f"  → DF2: {len(cols_b)} columns")
+        
         # Find column mapping
         mapping, avg_score = self.find_column_mapping(cols_a, cols_b)
+        
+        print(f"  → Matched {len(mapping)}/{len(cols_b)} columns from DF2 to DF1")
+        if len(mapping) > 0:
+            print(f"  → Average similarity score: {avg_score:.3f}")
+            # Show some mappings
+            sample_mappings = list(mapping.items())[:3]
+            for col_b, col_a in sample_mappings:
+                print(f"    • '{col_b}' → '{col_a}'")
+            if len(mapping) > 3:
+                print(f"    ... and {len(mapping) - 3} more")
         
         # Compute coverage
         coverage = self.compute_coverage(mapping, cols_a, cols_b)
         
+        print(f"  → Coverage score: {coverage:.3f} (harmonic mean of match ratios)")
+        
         # Check if compatible (good coverage)
-        # Use a threshold of 0.5 for coverage (at least 50% columns match)
-        compatible = coverage >= 0.5
+        # Use a threshold of 0.7 for coverage (at least 70% columns match)
+        compatible = coverage >= self.config.UNION_COMPATIBILITY_THRESHOLD
+        
+        if compatible:
+            print(f"  ✓ UNION compatible (coverage {coverage:.3f} >= 0.7)")
+        else:
+            print(f"  ✗ UNION not compatible (coverage {coverage:.3f} < 0.7)")
         
         self.logger.debug(f"Union check: coverage={coverage:.3f}, avg_score={avg_score:.3f}, compatible={compatible}")
         
@@ -216,6 +237,8 @@ class UnionEngine:
         # Rename columns in df2 according to mapping
         df2_copy.rename(columns=column_mapping, inplace=True)
         
+        print(f"    → Renamed {len(column_mapping)} columns in DF2 to match DF1")
+        
         # Get all unique columns from both dataframes
         all_cols = list(set(df1.columns.tolist() + df2_copy.columns.tolist()))
         
@@ -233,7 +256,14 @@ class UnionEngine:
         result = pd.concat([df1, df2_copy], axis=0, ignore_index=True)
         
         # Remove exact duplicates
+        before_dedup = len(result)
         result = result.drop_duplicates()
+        after_dedup = len(result)
+        
+        print(f"    → Concatenated: {df1.shape[0]} + {df2.shape[0]} = {before_dedup} rows")
+        if before_dedup != after_dedup:
+            print(f"    → Removed {before_dedup - after_dedup} duplicate rows")
+        print(f"    → Final result: {result.shape[0]} rows × {result.shape[1]} columns")
         
         self.logger.info(f"Union executed: {df1.shape[0]} + {df2.shape[0]} → {result.shape[0]} rows")
         
@@ -268,19 +298,26 @@ class UnionEngine:
         while remaining:
             # Start with first dataframe
             current = remaining.pop(0)
-            current_name = f"DF{len(result_groups)}"
+            current_name = f"Group{len(result_groups)}"
+            
+            print(f"\n  Processing {current_name} (starting with {current.shape}):")
             
             # Try to union with remaining dataframes sequentially
             i = 0
+            union_count = 0
             while i < len(remaining):
                 next_df = remaining[i]
+                
+                print(f"\n  Checking {current_name} × DF{i}:")
                 
                 # Check compatibility
                 compatible, score, mapping = self.check_compatibility(current, next_df)
                 
                 if compatible:
                     # Execute union
+                    print(f"\n  ✓ Executing union for {current_name}:")
                     current = self.execute_union(current, next_df, mapping)
+                    union_count += 1
                     
                     # Log operation
                     operations.append({
@@ -300,7 +337,13 @@ class UnionEngine:
             
             # Add current (possibly unioned) dataframe to results
             result_groups.append(current)
+            
+            if union_count > 0:
+                print(f"\n  → {current_name} final shape: {current.shape} (unioned {union_count} dataframes)")
+            else:
+                print(f"\n  → {current_name} kept separate: {current.shape} (no compatible dataframes)")
         
+        print(f"\n  UNION STAGE COMPLETE: {len(dataframes)} input → {len(result_groups)} output groups")
         self.logger.info(f"Union complete: {len(dataframes)} → {len(result_groups)} groups")
         
         return result_groups, operations

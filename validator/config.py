@@ -1,6 +1,6 @@
 """
 Configuration for Validator Component
-Contains all thresholds, paths, and settings
+Contains all thresholds, paths, and settings including parallel processing
 """
 
 class ValidatorConfig:
@@ -12,36 +12,58 @@ class ValidatorConfig:
     UNION_THRESHOLD = 0.72  # Minimum score for column compatibility
     UNION_NAME_WEIGHT = 0.85  # Weight for name similarity in hybrid score
     UNION_MODEL_WEIGHT = 0.15  # Weight for model probability in hybrid score
+    UNION_COMPATIBILITY_THRESHOLD = 0.7  # Minimum hybrid score for column pair
     
     # Join thresholds
     JOIN_ROW_THRESHOLD = 0.44  # Minimum XGBoost probability for row pair
-    JOIN_RETENTION_THRESHOLD = 0.5  # Minimum retention ratio (matched_rows / denominator)
+    JOIN_RETENTION_THRESHOLD = 0.2  # Minimum retention ratio (matched_rows / denominator)
+    MAX_MATCHES_PER_ROW = 5  # Maximum matches per row in many-to-many join (0 = unlimited)
     
     # ==================== MODEL PATHS ====================
     
-    UNION_MODEL_PATH = "validator/models/union_model.pkl"
-    JOIN_MODEL_PATH = "validator/models/join_model.pkl"
+    UNION_MODEL_PATH = "models/union_model.pkl"
+    JOIN_MODEL_PATH = "models/join_model.json"
     FINBERT_MODEL_NAME = "ProsusAI/finbert"  # HuggingFace model name
     
     # ==================== PROCESSING LIMITS ====================
     
-    MAX_DATAFRAMES = 4  # Maximum input dataframes
-    MAX_COMBINATIONS = 1000000  # Safety limit for row pair combinations
+    MAX_DATAFRAMES = 10  # Maximum input dataframes
+    
+    # ==================== PARALLEL PROCESSING ====================
+
+    USE_PARALLEL = True  # Enable parallel processing
+    N_JOBS = 20  # Number of CPU cores to use (set to 20)
+
+    # ==================== GPU ACCELERATION ====================
+
+    USE_GPU = True  # Enable GPU acceleration for feature extraction and XGBoost
+    GPU_BATCH_SIZE = 1000000  # Number of row pairs to process per GPU batch (1M pairs, ~2.4GB VRAM)
+    GPU_ID = 0  # GPU device ID to use (0 for first GPU)
+
+    # Batch size recommendations for RTX 3090 (24GB VRAM):
+    # -   50,000: Safe baseline (~120 MB per batch)
+    # -  500,000: Conservative (~1.2 GB per batch)
+    # - 1,000,000: Recommended (~2.4 GB per batch) ⭐
+    # - 2,000,000: Aggressive (~4.8 GB per batch)
+    # - 5,000,000: Maximum (~12 GB per batch, for very large datasets)
     
     # ==================== FEATURE ENGINEERING ====================
     
-    # Join features (25 total)
+    # Join features (26 total - including n_features)
     JOIN_FEATURES = [
-        'absdiff_min', 'absdiff_max', 'absdiff_mean', 'absdiff_median', 'absdiff_std',
+        'absdiff_mean', 'absdiff_median', 'absdiff_max', 'absdiff_min', 'absdiff_std',
         'reldiff_mean', 'reldiff_median',
-        'ratio_mean', 'ratio_median', 'ratio_std',
         'zdiff_mean', 'zdiff_max',
         'pcdiff_mean', 'pcdiff_sq_mean',
-        'L1_raw', 'L1_z', 'L1_pct',
-        'L2_raw', 'L2_z', 'L2_pct',
+        'L1_raw', 'L2_raw',
+        'L1_z', 'L2_z',
+        'L1_pct', 'L2_pct',
         'correlation',
-        'n_close', 'n_very_close', 'n_both_zero',
-        'sign_agreement'
+        'ratio_mean', 'ratio_median', 'ratio_std',
+        'sign_agreement',
+        'n_features',
+        'n_both_zero',
+        'n_close', 'n_very_close'
     ]
     
     # Tolerance values for feature computation
