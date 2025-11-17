@@ -1,5 +1,6 @@
 """
 Data Contracts - Updated for LLM-driven architecture with validation reports
+UPDATED: Added semantic_keywords to LLMResponse for query intent modeling
 """
 from pydantic import BaseModel, Field
 from typing import Dict, List, Any, Optional, Literal
@@ -7,7 +8,7 @@ import pandas as pd
 
 
 # ============================================================================
-# CONTRACT A: QueryAnalyzer Output (NEW)
+# CONTRACT A: QueryAnalyzer Output (UPDATED)
 # ============================================================================
 
 class FeatureSpec(BaseModel):
@@ -27,6 +28,7 @@ class LLMAPIRequest(BaseModel):
 class LLMResponse(BaseModel):
     """Complete LLM output from QueryAnalyzer"""
     features: FeatureSpec
+    semantic_keywords: List[str] = Field(default_factory=list, description="Intent keywords from query")
     api_requests: List[LLMAPIRequest]
     tickers: List[str] = Field(default_factory=list)
 

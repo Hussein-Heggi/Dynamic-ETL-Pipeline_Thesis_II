@@ -2,6 +2,8 @@
 Ingestor - Main orchestrator for the financial data ETL pipeline.
 MAJOR UPDATE: LLM-driven endpoint selection with FAISS validation and output validation
 UPDATED: Semantic validation now uses native features instead of raw query
+UPDATED: Returns 4 outputs - (dataframes, enrichment_features, key_features, validation_reports)
+         key_features now models query intent with tickers + semantic_keywords + enrichment
 """
 import time
 from typing import List, Tuple
@@ -21,13 +23,13 @@ class Ingestor:
     Main orchestrator for financial data ETL pipeline.
     
     Pipeline flow:
-    1. User Prompt → QueryAnalyzer (LLM) → LLMResponse {features, api_requests}
+    1. User Prompt → QueryAnalyzer (LLM) → LLMResponse {features, semantic_keywords, api_requests}
     2. LLMResponse → Convert to APIRequests → ExecutionPlan
     3. ExecutionPlan → EndpointValidator (FAISS) → Semantic scores (validates native features)
     4. ExecutionPlan → ParameterValidator → Schema validation
     5. Validated Plan → API Execution → ExecutionResults
     6. ExecutionResults → OutputValidator → ValidationReports
-    7. Return (dataframes, key_features, validation_reports)
+    7. Return (dataframes, enrichment_features, key_features, validation_reports)
     """
     
     def __init__(
@@ -72,10 +74,10 @@ class Ingestor:
         self, 
         prompt: str, 
         verbose: bool = True
-    ) -> Tuple[List[pd.DataFrame], List[str], List[ValidationReport]]:
+    ) -> Tuple[List[pd.DataFrame], List[str], List[str], List[ValidationReport]]:
         """
         MAIN ENTRY POINT - Process natural language prompt
-        UPDATED: Now returns (dataframes, key_features, validation_reports)
+        UPDATED: Now returns 4 outputs instead of 3
         
         Args:
             prompt: Natural language query for financial data
@@ -84,7 +86,8 @@ class Ingestor:
         Returns:
             Tuple of:
                 - List of DataFrames containing requested financial data
-                - List of key features (tickers + native + enrichment)
+                - List of enrichment features (technical indicators with parameters)
+                - List of key features (query intent: tickers + semantic_keywords + enrichment)
                 - List of ValidationReports (one per successful dataset)
         """
         start_time = time.time()
@@ -105,12 +108,10 @@ class Ingestor:
             print(f"  ✓ Features:")
             print(f"    - Native: {llm_response.features.native}")
             print(f"    - Enrichment: {llm_response.features.enrichment}")
+            print(f"  ✓ Semantic Keywords: {llm_response.semantic_keywords}")
             print(f"  ✓ LLM selected {len(llm_response.api_requests)} endpoint(s):")
             for req in llm_response.api_requests:
-                print(f"\n    → {req.api_name}.{req.endpoint_name}")
-                print(f"      Parameters: {req.parameters}")
-                if req.reasoning:
-                    print(f"      Reasoning: {req.reasoning}")
+                print(f"    - {req.api_name}.{req.endpoint_name}")
         
         # Step 2: Convert to ExecutionPlan
         if verbose:
@@ -173,7 +174,8 @@ class Ingestor:
             llm_response.features.native
         )
         
-        # Extract key features
+        # Extract enrichment features and key features
+        enrichment_features = llm_response.features.enrichment
         key_features = self._extract_key_features(llm_response)
         
         elapsed_time = (time.time() - start_time) * 1000
@@ -195,10 +197,11 @@ class Ingestor:
                     if report.missing_features:
                         print(f"     Missing: {report.missing_features}")
             
-            print(f"\nKey features: {key_features}")
+            print(f"\nEnrichment features: {enrichment_features}")
+            print(f"Key features (query intent): {key_features}")
             print(f"{'=' * 80}\n")
         
-        return dataframes, key_features, validation_reports
+        return dataframes, enrichment_features, key_features, validation_reports
     
     def _build_execution_plan(self, llm_response) -> ExecutionPlan:
         """Convert LLM response to ExecutionPlan with APIRequests"""
@@ -216,10 +219,29 @@ class Ingestor:
         return ExecutionPlan(ranked_requests=requests)
     
     def _extract_key_features(self, llm_response) -> List[str]:
-        """Extract key features as flat list: [tickers..., native..., enrichment...]"""
+        """
+        Extract key features that model query intent.
+        UPDATED: key_features = tickers + semantic_keywords + enrichment_features
+        
+        This represents what the user ASKED FOR, not the infrastructure columns.
+        Example: "Show me NVDA daily prices with 20-day SMA"
+          → key_features = ["NVDA", "daily", "price", "stock", "SMA_20"]
+        
+        Args:
+            llm_response: LLM response containing tickers, semantic_keywords, and enrichment features
+            
+        Returns:
+            List of features representing query intent
+        """
         key_features = []
+        
+        # Add tickers
         key_features.extend(llm_response.tickers)
-        key_features.extend(llm_response.features.native)
+        
+        # Add semantic keywords (query intent descriptors)
+        key_features.extend(llm_response.semantic_keywords)
+        
+        # Add enrichment features (technical indicators)
         key_features.extend(llm_response.features.enrichment)
         
         # Deduplicate while preserving order
@@ -311,7 +333,7 @@ class Ingestor:
             
             # Check if DataFrame is empty
             if df.empty:
-                print(f"  ⚠   API returned empty DataFrame")
+                print(f"  ⚠  API returned empty DataFrame")
                 return APIResult(
                     api_name=api_name,
                     endpoint_name=endpoint_name,
