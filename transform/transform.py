@@ -26,6 +26,7 @@ def transform_pipeline(
     dataframes: list[pd.DataFrame],
     keywords: list[str],
     registry_path: str = "registry.yaml",
+    column_delete_threshold: float = 0.5,
 ) -> tuple[list[pd.DataFrame], dict[str, Any]]:
     """
     Complete transform phase: clean and enrich multiple DataFrames.
@@ -35,6 +36,9 @@ def transform_pipeline(
         keywords: List of feature keywords to apply to all DataFrames.
                  The same features will be applied to each DataFrame.
         registry_path: Path to the feature registry YAML file
+        column_delete_threshold: Ratio threshold for column deletion during cleaning (default 0.5).
+                                 Columns with null_ratio > threshold are deleted.
+                                 Columns with null_ratio <= threshold get imputed.
 
     Returns:
         tuple: (enriched_dataframes, pipeline_metadata)
@@ -87,7 +91,7 @@ def transform_pipeline(
         try:
             # Phase 1: Data Cleaning
             logger.info(f"[DataFrame {idx + 1}] Phase 1: Data Cleaning")
-            cleaned_df, cleaning_report = pipeline_clean(df)
+            cleaned_df, cleaning_report = pipeline_clean(df, column_delete_threshold)
             result["cleaning"] = cleaning_report
             result["cleaned_shape"] = cleaned_df.shape
 
@@ -143,7 +147,7 @@ def transform_pipeline(
 
             # Phase 3: Post-Enrichment Data Cleaning
             logger.info(f"[DataFrame {idx + 1}] Phase 3: Post-Enrichment Cleaning")
-            final_df, post_cleaning_report = pipeline_clean(enriched_df)
+            final_df, post_cleaning_report = pipeline_clean(enriched_df, column_delete_threshold)
             result["post_enrichment_cleaning"] = post_cleaning_report
             result["post_cleaned_shape"] = final_df.shape
 
@@ -209,6 +213,7 @@ def transform_pipeline_from_list(
     dataframes: list[pd.DataFrame],
     keywords: list[str],
     registry_path: str = "registry.yaml",
+    column_delete_threshold: float = 0.5,
 ) -> tuple[list[pd.DataFrame], dict[str, Any]]:
     """
     Alias for transform_pipeline for backwards compatibility.
@@ -217,6 +222,7 @@ def transform_pipeline_from_list(
         dataframes: List of DataFrames to transform
         keywords: List of feature keywords to apply to all DataFrames
         registry_path: Path to the feature registry YAML file
+        column_delete_threshold: Ratio threshold for column deletion during cleaning (default 0.5)
 
     Returns:
         Same as transform_pipeline()
@@ -227,13 +233,14 @@ def transform_pipeline_from_list(
         ...     ["20 day sma on close", "14 day rsi"]
         ... )
     """
-    return transform_pipeline(dataframes, keywords, registry_path)
+    return transform_pipeline(dataframes, keywords, registry_path, column_delete_threshold)
 
 
 def transform_single(
     df: pd.DataFrame,
     keywords: list[str],
     registry_path: str = "registry.yaml",
+    column_delete_threshold: float = 0.5,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """
     Convenience function for transforming a single DataFrame.
@@ -242,6 +249,7 @@ def transform_single(
         df: DataFrame to transform
         keywords: List of feature keywords
         registry_path: Path to the feature registry YAML file
+        column_delete_threshold: Ratio threshold for column deletion during cleaning (default 0.5)
 
     Returns:
         tuple: (enriched_dataframe, metadata)
@@ -252,7 +260,7 @@ def transform_single(
         >>> enriched_df, metadata = transform_single(df, keywords)
     """
     enriched_dfs, pipeline_metadata = transform_pipeline(
-        [df], keywords, registry_path
+        [df], keywords, registry_path, column_delete_threshold
     )
 
     # Extract single result

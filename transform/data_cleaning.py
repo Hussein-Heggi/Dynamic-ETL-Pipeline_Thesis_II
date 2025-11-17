@@ -21,14 +21,23 @@ logging.basicConfig(
 REQUIRED_COLS = ["ticker", "ts", "open", "high", "low", "close", "volume"]
 
 
-def clean_stock_bars(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+def clean_stock_bars(df: pd.DataFrame, column_delete_threshold: float = 0.5) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
     No-exception cleaner:
      - keeps tz-aware UTC in 'ts'
      - drops exact duplicate rows only
+     - handles null values based on column_delete_threshold:
+       * if column null_ratio > threshold: delete entire column
+       * if column null_ratio <= threshold: impute missing values
      - hard-drops invalid rows (future ts, negative/zero prices, bad high/low, negative volume)
      - soft-fixes vwap (set NaN if out of [low, high]) and transactions (nullable Int64, <0 -> NA)
      - returns (clean_df, report)
+
+    Args:
+        df: Input DataFrame to clean
+        column_delete_threshold: Ratio threshold for column deletion (default 0.5).
+                                 Columns with null_ratio > threshold are deleted.
+                                 Columns with null_ratio <= threshold get imputed.
     """
     rep: Dict[str, Any] = {"clean": {}}
     d = df.copy()
@@ -57,24 +66,112 @@ def clean_stock_bars(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     d = d.drop_duplicates(keep="first")
     rep["clean"]["exact_duplicates_dropped"] = int(before - len(d))
 
-    # Hard filters
-    now_utc = pd.Timestamp.now(tz="UTC")
-    oc_max = d[["open", "close"]].max(axis=1)
-    oc_min = d[["open", "close"]].min(axis=1)
+    # Handle null values based on column_delete_threshold
+    rep["clean"]["null_handling"] = {
+        "threshold": column_delete_threshold,
+        "columns_deleted": [],
+        "columns_imputed": {}
+    }
 
-    keep_mask = (
-        d[["ticker", "ts", "open", "high", "low", "close", "volume"]]
-        .notna()
-        .all(axis=1)
-        & (d["ts"] <= now_utc)
-        & (d["open"] > 0)
-        & (d["high"] > 0)
-        & (d["low"] > 0)
-        & (d["close"] > 0)
-        & (d["high"] >= oc_max)
-        & (d["low"] <= oc_min)
-        & (d["volume"] >= 0)
-    )
+    total_rows = len(d)
+    columns_to_delete = []
+
+    for col in d.columns:
+        null_count = d[col].isna().sum()
+        null_ratio = null_count / total_rows if total_rows > 0 else 0
+
+        if null_ratio > column_delete_threshold:
+            # Delete column if null ratio exceeds threshold
+            columns_to_delete.append(col)
+            rep["clean"]["null_handling"]["columns_deleted"].append({
+                "column": col,
+                "null_ratio": float(null_ratio),
+                "null_count": int(null_count)
+            })
+        elif null_count > 0:
+            # Impute missing values if null ratio is within threshold
+            imputation_info = {
+                "null_count": int(null_count),
+                "null_ratio": float(null_ratio),
+                "method": None
+            }
+
+            # Determine column type and impute accordingly
+            if pd.api.types.is_numeric_dtype(d[col]) and not pd.api.types.is_datetime64_any_dtype(d[col]):
+                # Numerical column: use normal distribution
+                non_null_values = d[col].dropna()
+                if len(non_null_values) > 0:
+                    mean_val = non_null_values.mean()
+                    std_val = non_null_values.std()
+                    if pd.isna(std_val) or std_val == 0:
+                        # If std is 0 or NaN, just use the mean
+                        imputed_values = np.full(null_count, mean_val)
+                    else:
+                        # Sample from normal distribution
+                        imputed_values = np.random.normal(mean_val, std_val, null_count)
+                    d.loc[d[col].isna(), col] = imputed_values
+                    imputation_info["method"] = "normal_distribution"
+                    imputation_info["mean"] = float(mean_val)
+                    imputation_info["std"] = float(std_val) if not pd.isna(std_val) else 0.0
+
+            elif pd.api.types.is_datetime64_any_dtype(d[col]):
+                # Datetime column: use Unix epoch
+                unix_epoch = pd.Timestamp("1970-01-01", tz=d[col].dt.tz if hasattr(d[col].dt, 'tz') else None)
+                d.loc[d[col].isna(), col] = unix_epoch
+                imputation_info["method"] = "unix_epoch"
+                imputation_info["value"] = str(unix_epoch)
+
+            else:
+                # Categorical/string column: use constant "Unknown"
+                d.loc[d[col].isna(), col] = "Unknown"
+                imputation_info["method"] = "constant"
+                imputation_info["value"] = "Unknown"
+
+            rep["clean"]["null_handling"]["columns_imputed"][col] = imputation_info
+
+    # Delete columns that exceed threshold
+    if columns_to_delete:
+        d = d.drop(columns=columns_to_delete)
+        rep["clean"]["null_handling"]["total_columns_deleted"] = len(columns_to_delete)
+
+    # Hard filters (note: nulls are already handled above via imputation/column deletion)
+    # Only check columns that still exist after potential column deletions
+    existing_required = [c for c in REQUIRED_COLS if c in d.columns]
+
+    if not existing_required:
+        # If all required columns were deleted, return empty DataFrame
+        rep["clean"]["hard_rows_dropped"] = 0
+        rep["clean"]["warning"] = "All required columns were deleted due to high null ratio"
+        return pd.DataFrame(), rep
+
+    # Build keep_mask based on which columns still exist
+    keep_mask = pd.Series([True] * len(d), index=d.index)
+
+    if "ts" in d.columns:
+        now_utc = pd.Timestamp.now(tz="UTC")
+        keep_mask &= d["ts"] <= now_utc
+
+    if "open" in d.columns:
+        keep_mask &= d["open"] > 0
+
+    if "high" in d.columns:
+        keep_mask &= d["high"] > 0
+
+    if "low" in d.columns:
+        keep_mask &= d["low"] > 0
+
+    if "close" in d.columns:
+        keep_mask &= d["close"] > 0
+
+    if "volume" in d.columns:
+        keep_mask &= d["volume"] >= 0
+
+    # Check high/low relationships if all relevant columns exist
+    if all(c in d.columns for c in ["open", "close", "high", "low"]):
+        oc_max = d[["open", "close"]].max(axis=1)
+        oc_min = d[["open", "close"]].min(axis=1)
+        keep_mask &= (d["high"] >= oc_max) & (d["low"] <= oc_min)
+
     rep["clean"]["hard_rows_dropped"] = int((~keep_mask).sum())
     d = d.loc[keep_mask].copy()
 
@@ -214,10 +311,17 @@ def pandera_validate_safely(
 
 def pipeline_clean(
     data: Union[str, pd.DataFrame],
+    column_delete_threshold: float = 0.5,
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
     Accepts CSV path or DataFrame.
     Returns (cleaned_df, report). Never raises.
+
+    Args:
+        data: CSV file path or pandas DataFrame to clean
+        column_delete_threshold: Ratio threshold for column deletion (default 0.5).
+                                 Columns with null_ratio > threshold are deleted.
+                                 Columns with null_ratio <= threshold get imputed.
     """
     report: Dict[str, Any] = {}
 
@@ -241,7 +345,7 @@ def pipeline_clean(
         report["read"] = {"path": None, "rows": len(df), "columns": list(df.columns)}
 
     # Clean data
-    cleaned, clean_rep = clean_stock_bars(df)
+    cleaned, clean_rep = clean_stock_bars(df, column_delete_threshold)
     report.update(clean_rep)
 
     # Validate with Pandera
