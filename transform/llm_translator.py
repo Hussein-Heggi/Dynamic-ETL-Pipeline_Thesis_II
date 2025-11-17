@@ -90,16 +90,22 @@ CUSTOM FEATURES:
   * "code": Python code string that computes the feature
   * "as": The output column name for the feature
 - The code runs in a RESTRICTED ENVIRONMENT with:
-  * Safe builtins only (NO file I/O, NO imports, NO exec/eval, NO system calls, NO print)
-  * Available modules: numpy (as np), pandas (as pd), math, random
+  * Safe builtins only (NO file I/O, NO exec/eval, NO system calls, NO print)
+  * NO IMPORTS ALLOWED - The following are already pre-imported and available:
+    - np: NumPy library (use directly, e.g., np.log(), np.sqrt())
+    - pd: Pandas library (use directly, e.g., pd.Series())
+    - math: Python math module
+    - random: Python random module
   * Input variable 'g': The group DataFrame (one ticker's data)
   * Output: MUST assign the result to a variable named 'series' (must be a pd.Series)
 - For multiline code, use \\n to separate lines in the JSON string
+- IMPORTANT: DO NOT include import statements. Libraries are already available as np, pd, math, and random.
 - Example code patterns:
   * "series = g['close'] / g['open']"
   * "series = (g['high'] + g['low']) / 2"
   * "series = g['close'].rolling(10).mean() / g['close']"
   * "series = np.log(g['close'] / g['close'].shift(1))"
+  * "series = math.sqrt(g['close'])"
   * "momentum = g['close'].diff(5)\\nseries = momentum / g['close'].rolling(20).std()"
 
 ALLOWED FEATURES:
