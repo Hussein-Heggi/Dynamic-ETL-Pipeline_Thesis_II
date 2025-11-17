@@ -252,18 +252,12 @@ class UnionEngine:
         # Ensure same column order
         df2_copy = df2_copy[df1.columns]
         
-        # Concatenate vertically
+        # Concatenate vertically (keep all columns, fill missing with NaN)
         result = pd.concat([df1, df2_copy], axis=0, ignore_index=True)
-        
-        # Remove exact duplicates
-        before_dedup = len(result)
-        result = result.drop_duplicates()
-        after_dedup = len(result)
-        
-        print(f"    → Concatenated: {df1.shape[0]} + {df2.shape[0]} = {before_dedup} rows")
-        if before_dedup != after_dedup:
-            print(f"    → Removed {before_dedup - after_dedup} duplicate rows")
-        print(f"    → Final result: {result.shape[0]} rows × {result.shape[1]} columns")
+
+        print(f"    → Concatenated: {df1.shape[0]} + {df2.shape[0]} = {len(result)} rows")
+        print(f"    → Result: {result.shape[0]} rows × {result.shape[1]} columns")
+        print(f"    → (Duplicate removal will be performed after all unions complete)")
         
         self.logger.info(f"Union executed: {df1.shape[0]} + {df2.shape[0]} → {result.shape[0]} rows")
         
@@ -345,5 +339,30 @@ class UnionEngine:
         
         print(f"\n  UNION STAGE COMPLETE: {len(dataframes)} input → {len(result_groups)} output groups")
         self.logger.info(f"Union complete: {len(dataframes)} → {len(result_groups)} groups")
-        
-        return result_groups, operations
+
+        # Remove duplicates from all result groups
+        print(f"\n  Removing duplicates from all groups...")
+        deduplicated_groups = []
+        total_duplicates_removed = 0
+
+        for idx, df in enumerate(result_groups):
+            before_dedup = len(df)
+            df_dedup = df.drop_duplicates(keep='first')
+            after_dedup = len(df_dedup)
+            duplicates_removed = before_dedup - after_dedup
+            total_duplicates_removed += duplicates_removed
+
+            deduplicated_groups.append(df_dedup)
+
+            if duplicates_removed > 0:
+                print(f"    → Group {idx}: Removed {duplicates_removed} duplicate rows ({before_dedup} → {after_dedup})")
+                self.logger.info(f"Group {idx}: Removed {duplicates_removed} duplicates ({before_dedup} → {after_dedup})")
+            else:
+                print(f"    → Group {idx}: No duplicates found ({before_dedup} rows)")
+
+        if total_duplicates_removed > 0:
+            print(f"\n  ✓ Total duplicates removed across all groups: {total_duplicates_removed}")
+        else:
+            print(f"\n  ✓ No duplicates found in any group")
+
+        return deduplicated_groups, operations

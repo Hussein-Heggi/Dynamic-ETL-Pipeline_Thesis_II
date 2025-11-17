@@ -103,7 +103,99 @@ class Validator:
                 raise ValueError(f"DataFrame {i} is empty")
         
         self.logger.debug(f"Input validation passed: {len(dataframes)} dataframes")
-    
+
+    def _create_versions(self, dataframes: List[pd.DataFrame]) -> List[pd.DataFrame]:
+        """
+        Create versioned outputs from dataframes with duplicate columns (_x and _y suffixes)
+
+        For each dataframe:
+        - If it has columns with _x and _y suffixes, create 2 versions:
+          - Version 1: Keep _x columns, drop _y columns, rename _x → original
+          - Version 2: Keep _y columns, drop _x columns, rename _y → original
+        - If no duplicate columns exist, keep dataframe as is
+
+        Args:
+            dataframes: List of dataframes (may contain duplicate columns)
+
+        Returns:
+            List of versioned dataframes (may be larger than input)
+        """
+        versioned_dfs = []
+
+        print("\n" + "=" * 70)
+        print("CREATING VERSIONED OUTPUTS")
+        print("=" * 70)
+        print("\nSplitting dataframes with duplicate columns (_x/_y suffixes)...")
+
+        self.logger.info("")
+        self.logger.info("=" * 60)
+        self.logger.info("CREATING VERSIONED OUTPUTS")
+        self.logger.info("=" * 60)
+
+        for idx, df in enumerate(dataframes):
+            # Identify columns with _x and _y suffixes
+            x_cols = [col for col in df.columns if col.endswith('_x')]
+            y_cols = [col for col in df.columns if col.endswith('_y')]
+
+            # Check if we have duplicate columns
+            has_duplicates = len(x_cols) > 0 and len(y_cols) > 0
+
+            if has_duplicates:
+                print(f"\n  DataFrame {idx}:")
+                print(f"    → Found {len(x_cols)} duplicate column pairs")
+                print(f"    → Creating 2 versions...")
+
+                self.logger.info(f"DataFrame {idx}: Found {len(x_cols)} duplicate pairs, creating versions")
+
+                # Get base column names (without suffixes)
+                base_names_x = {col[:-2]: col for col in x_cols}  # Remove '_x'
+                base_names_y = {col[:-2]: col for col in y_cols}  # Remove '_y'
+
+                # Get non-duplicate columns (columns without _x or _y)
+                all_suffixed = set(x_cols) | set(y_cols)
+                non_duplicate_cols = [col for col in df.columns if col not in all_suffixed]
+
+                # VERSION 1: Use _x columns
+                version1 = df.copy()
+                # Drop all _y columns
+                version1 = version1.drop(columns=y_cols)
+                # Rename _x columns to original names
+                rename_map_x = {col: col[:-2] for col in x_cols}
+                version1 = version1.rename(columns=rename_map_x)
+
+                # VERSION 2: Use _y columns
+                version2 = df.copy()
+                # Drop all _x columns
+                version2 = version2.drop(columns=x_cols)
+                # Rename _y columns to original names
+                rename_map_y = {col: col[:-2] for col in y_cols}
+                version2 = version2.rename(columns=rename_map_y)
+
+                versioned_dfs.append(version1)
+                versioned_dfs.append(version2)
+
+                print(f"    → Version 1: {version1.shape[0]} rows × {version1.shape[1]} columns (using _x values)")
+                print(f"    → Version 2: {version2.shape[0]} rows × {version2.shape[1]} columns (using _y values)")
+
+                self.logger.info(f"  Version 1: {version1.shape}")
+                self.logger.info(f"  Version 2: {version2.shape}")
+            else:
+                # No duplicate columns, keep as is
+                versioned_dfs.append(df)
+                print(f"\n  DataFrame {idx}:")
+                print(f"    → No duplicate columns found")
+                print(f"    → Keeping original: {df.shape[0]} rows × {df.shape[1]} columns")
+
+                self.logger.info(f"DataFrame {idx}: No duplicates, keeping original ({df.shape})")
+
+        print(f"\n  VERSIONING COMPLETE: {len(dataframes)} input → {len(versioned_dfs)} output dataframes")
+        print("=" * 70)
+
+        self.logger.info(f"Versioning complete: {len(dataframes)} → {len(versioned_dfs)} dataframes")
+        self.logger.info("=" * 60)
+
+        return versioned_dfs
+
     def process(
         self,
         dataframes: List[pd.DataFrame]
@@ -196,12 +288,26 @@ class Validator:
             report['early_termination'] = True
             report['output_count'] = 1
             report['output_shapes'] = [unioned_dfs[0].shape]
-            
+
+            # Create versioned outputs
+            versioned_outputs = self._create_versions(unioned_dfs)
+
+            # Update report with versioned counts
+            report['output_count'] = len(versioned_outputs)
+            report['output_shapes'] = [df.shape for df in versioned_outputs]
+
             print("\n" + "=" * 70)
             print("VALIDATOR PIPELINE COMPLETE")
             print("=" * 70)
-            
-            return unioned_dfs, report
+            print(f"\nFinal Summary:")
+            print(f"  Input:  {len(dataframes)} dataframes")
+            print(f"  Output: {len(versioned_outputs)} dataframe(s)")
+            print()
+            for i, df in enumerate(versioned_outputs):
+                print(f"  Output {i}: {df.shape[0]} rows × {df.shape[1]} columns")
+            print("\n" + "=" * 70 + "\n")
+
+            return versioned_outputs, report
         
         # 4. JOIN STAGE 1
         print("\n" + "=" * 70)
@@ -263,19 +369,26 @@ class Validator:
             report['stage_2_skipped'] = True
             report['output_count'] = len(stage1_dfs)
             report['output_shapes'] = [df.shape for df in stage1_dfs]
-            
+
+            # Create versioned outputs
+            versioned_outputs = self._create_versions(stage1_dfs)
+
+            # Update report with versioned counts
+            report['output_count'] = len(versioned_outputs)
+            report['output_shapes'] = [df.shape for df in versioned_outputs]
+
             print("\n" + "=" * 70)
             print("VALIDATOR PIPELINE COMPLETE")
             print("=" * 70)
             print(f"\nFinal Summary:")
             print(f"  Input:  {len(dataframes)} dataframes")
-            print(f"  Output: {len(stage1_dfs)} dataframe(s)")
+            print(f"  Output: {len(versioned_outputs)} dataframe(s)")
             print()
-            for i, df in enumerate(stage1_dfs):
+            for i, df in enumerate(versioned_outputs):
                 print(f"  Output {i}: {df.shape[0]} rows × {df.shape[1]} columns")
             print("\n" + "=" * 70 + "\n")
-            
-            return stage1_dfs, report
+
+            return versioned_outputs, report
         
         # 6. Stage 2: Join the joined groups
         print("\n" + "-" * 70)
@@ -301,31 +414,34 @@ class Validator:
         # Update report
         report['join_operations']['stage_2'] = stage2_ops
         report['stage_2_skipped'] = False
-        
-        # 7. Finalize report
-        report['output_count'] = len(final_dfs)
-        report['output_shapes'] = [df.shape for df in final_dfs]
-        
+
+        # 7. Create versioned outputs
+        versioned_outputs = self._create_versions(final_dfs)
+
+        # 8. Finalize report
+        report['output_count'] = len(versioned_outputs)
+        report['output_shapes'] = [df.shape for df in versioned_outputs]
+
         print("\n" + "=" * 70)
         print("VALIDATOR PIPELINE COMPLETE")
         print("=" * 70)
         print(f"\nFinal Summary:")
         print(f"  Input:  {len(dataframes)} dataframes")
-        print(f"  Output: {len(final_dfs)} dataframe(s)")
+        print(f"  Output: {len(versioned_outputs)} dataframe(s)")
         print()
-        for i, df in enumerate(final_dfs):
+        for i, df in enumerate(versioned_outputs):
             print(f"  Output {i}: {df.shape[0]} rows × {df.shape[1]} columns")
         print("\n" + "=" * 70 + "\n")
-        
+
         self.logger.info("")
         self.logger.info("=" * 60)
         self.logger.info("VALIDATOR PIPELINE COMPLETE")
-        self.logger.info(f"Output: {len(final_dfs)} dataframe(s)")
-        for i, df in enumerate(final_dfs):
+        self.logger.info(f"Output: {len(versioned_outputs)} dataframe(s)")
+        for i, df in enumerate(versioned_outputs):
             self.logger.info(f"  Output{i}: {df.shape}")
         self.logger.info("=" * 60)
-        
-        return final_dfs, report
+
+        return versioned_outputs, report
     
     def get_summary(self, report: Dict) -> str:
         """
