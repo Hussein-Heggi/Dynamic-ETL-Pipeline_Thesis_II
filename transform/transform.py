@@ -12,8 +12,9 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from data_cleaning import pipeline_clean
-from enrichment import enrich_dataframe_from_keywords
+
+from .data_cleaning import pipeline_clean
+from .enrichment import enrich_dataframe_from_keywords
 
 # Configure logging
 logging.basicConfig(

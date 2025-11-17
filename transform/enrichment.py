@@ -1,3 +1,4 @@
+import logging
 import math
 import random
 import traceback
@@ -8,8 +9,15 @@ import yaml
 from RestrictedPython import limited_builtins, safe_globals
 from RestrictedPython.Guards import safe_builtins
 
-from dsl_validator import validate_dsl
-from llm_translator import get_llm_recipe
+from .dsl_validator import validate_dsl
+from .llm_translator import get_llm_recipe
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
 # --- 1. Helper Functions ---
@@ -192,6 +200,11 @@ def feat_zscore(g: pd.DataFrame, on: str, window: int) -> pd.Series:
 
 #  Calendar Features
 def feat_session_flags(g: pd.DataFrame) -> pd.DataFrame:
+    if "ts" not in g.columns:
+        raise ValueError(
+            "feat_session_flags requires 'ts' column to be present in the DataFrame"
+        )
+
     ts = g["ts"]
     # Return a DataFrame instead of a dict
     return pd.DataFrame(
@@ -233,10 +246,27 @@ def apply_features(df: pd.DataFrame, dsl: dict, registry: dict) -> pd.DataFrame:
     Applies features to a DataFrame based on a validated DSL recipe.
     Note: DSL should be validated and enriched with defaults before calling this function.
     """
-    if not {"ticker", "ts"}.issubset(df.columns):
-        raise ValueError("DataFrame must contain 'ticker' and 'ts' columns.")
+    # Check if ticker and ts columns are available for grouping/sorting
+    has_ticker = "ticker" in df.columns
+    has_ts = "ts" in df.columns
 
-    df_enriched = df.sort_values(["ticker", "ts"]).copy()
+    # Log warning if expected columns are missing
+    if not has_ticker:
+        logger.warning(
+            "'ticker' column not found in DataFrame. Features will be applied without grouping by ticker."
+        )
+    if not has_ts:
+        logger.warning(
+            "'ts' column not found in DataFrame. Features will not be sorted by timestamp."
+        )
+
+    # Sort only by available columns
+    sort_cols = [c for c in ["ticker", "ts"] if c in df.columns]
+    if sort_cols:
+        df_enriched = df.sort_values(sort_cols).copy()
+    else:
+        df_enriched = df.copy()
+
     all_new_cols = []
 
     for request in dsl.get("features", []):
@@ -249,22 +279,33 @@ def apply_features(df: pd.DataFrame, dsl: dict, registry: dict) -> pd.DataFrame:
             code = final_params["code"]
             output_col_name = final_params["as"]
 
-            result_list = [
-                _execute_custom_code(code, group_df)
-                for _, group_df in df_enriched.groupby("ticker")
-            ]
-            full_result = pd.concat(result_list)
+            # TODO: check if we should groupby ticker
+            if has_ticker:
+                result_list = [
+                    _execute_custom_code(code, group_df)
+                    for _, group_df in df_enriched.groupby("ticker")
+                ]
+                full_result = pd.concat(result_list)
+            else:
+                # Apply to entire DataFrame if no ticker column
+                full_result = _execute_custom_code(code, df_enriched)
+
             all_new_cols.append(full_result.rename(output_col_name))
         else:
             # Use standard feature implementation
             impl_func = FEATURE_IMPLEMENTATIONS.get(name)
 
-            # Direct Calculation per Group
-            result_list = [
-                impl_func(group_df, **final_params)
-                for _, group_df in df_enriched.groupby("ticker")
-            ]
-            full_result = pd.concat(result_list)
+            # Direct Calculation per Group (or entire DataFrame if no ticker)
+            # TODO: check if we should groupby ticker
+            if has_ticker:
+                result_list = [
+                    impl_func(group_df, **final_params)
+                    for _, group_df in df_enriched.groupby("ticker")
+                ]
+                full_result = pd.concat(result_list)
+            else:
+                # Apply to entire DataFrame if no ticker column
+                full_result = impl_func(df_enriched, **final_params)
 
             # Assign Results
             if isinstance(full_result, pd.DataFrame):
@@ -327,7 +368,9 @@ def enrich_dataframe_from_keywords(
     available_columns = list(df.columns)
 
     # Get DSL from LLM
-    dsl_string = get_llm_recipe(user_keywords, allowed_features_prompt, available_columns)
+    dsl_string = get_llm_recipe(
+        user_keywords, allowed_features_prompt, available_columns
+    )
 
     # Validate and enrich DSL with defaults
     dsl, errors = validate_dsl(dsl_string, registry)
@@ -340,9 +383,9 @@ def enrich_dataframe_from_keywords(
     }
 
     if errors:
-        print(f"DSL Validation failed with {len(errors)} error(s):")
+        logger.error(f"DSL Validation failed with {len(errors)} error(s):")
         for error in errors:
-            print(f"  - {error}")
+            logger.error(f"  - {error}")
         return df, metadata
 
     # Apply features
@@ -352,7 +395,7 @@ def enrich_dataframe_from_keywords(
         return df_enriched, metadata
     except Exception as e:
         metadata["errors"].append(f"Feature application error: {str(e)}")
-        print(f"Feature application failed: {e}")
+        logger.error(f"Feature application failed: {e}")
         return df, metadata
 
 
