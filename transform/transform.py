@@ -8,10 +8,10 @@ Handles data cleaning and feature enrichment for multiple DataFrames.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
-
 from data_cleaning import pipeline_clean
 from enrichment import enrich_dataframe_from_keywords
 
@@ -21,11 +21,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Default registry path relative to transform directory
+DEFAULT_REGISTRY_PATH = str(Path(__file__).parent / "registry.yaml")
+
 
 def transform_pipeline(
     dataframes: list[pd.DataFrame],
     keywords: list[str],
-    registry_path: str = "registry.yaml",
+    registry_path: str = DEFAULT_REGISTRY_PATH,
     column_delete_threshold: float = 0.5,
 ) -> tuple[list[pd.DataFrame], dict[str, Any]]:
     """
@@ -147,7 +150,9 @@ def transform_pipeline(
 
             # Phase 3: Post-Enrichment Data Cleaning
             logger.info(f"[DataFrame {idx + 1}] Phase 3: Post-Enrichment Cleaning")
-            final_df, post_cleaning_report = pipeline_clean(enriched_df, column_delete_threshold)
+            final_df, post_cleaning_report = pipeline_clean(
+                enriched_df, column_delete_threshold
+            )
             result["post_enrichment_cleaning"] = post_cleaning_report
             result["post_cleaned_shape"] = final_df.shape
 
@@ -156,7 +161,9 @@ def transform_pipeline(
                     f"[DataFrame {idx + 1}] Post-enrichment cleaning resulted in empty DataFrame"
                 )
                 result["status"] = "empty_after_post_cleaning"
-                result["errors"].append("DataFrame is empty after post-enrichment cleaning")
+                result["errors"].append(
+                    "DataFrame is empty after post-enrichment cleaning"
+                )
                 enriched_dataframes.append(final_df)
                 pipeline_metadata["results"].append(result)
                 pipeline_metadata["total_errors"] += 1
@@ -212,7 +219,7 @@ def transform_pipeline(
 def transform_pipeline_from_list(
     dataframes: list[pd.DataFrame],
     keywords: list[str],
-    registry_path: str = "registry.yaml",
+    registry_path: str = DEFAULT_REGISTRY_PATH,
     column_delete_threshold: float = 0.5,
 ) -> tuple[list[pd.DataFrame], dict[str, Any]]:
     """
@@ -233,13 +240,15 @@ def transform_pipeline_from_list(
         ...     ["20 day sma on close", "14 day rsi"]
         ... )
     """
-    return transform_pipeline(dataframes, keywords, registry_path, column_delete_threshold)
+    return transform_pipeline(
+        dataframes, keywords, registry_path, column_delete_threshold
+    )
 
 
 def transform_single(
     df: pd.DataFrame,
     keywords: list[str],
-    registry_path: str = "registry.yaml",
+    registry_path: str = DEFAULT_REGISTRY_PATH,
     column_delete_threshold: float = 0.5,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """
@@ -312,9 +321,7 @@ if __name__ == "__main__":
     keywords = ["20 day sma on close", "14 day rsi"]
 
     # Run transform pipeline
-    enriched_dfs, metadata = transform_pipeline(
-        [sample_df1, sample_df2], keywords
-    )
+    enriched_dfs, metadata = transform_pipeline([sample_df1, sample_df2], keywords)
 
     print(f"\nProcessed {len(enriched_dfs)} DataFrames")
     for i, df in enumerate(enriched_dfs):
