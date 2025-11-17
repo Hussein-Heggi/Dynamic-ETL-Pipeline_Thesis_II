@@ -8,10 +8,14 @@ Original file is located at
 """
 
 from __future__ import annotations
-import pandas as pd
-import numpy as np
-from typing import Tuple, Union, Dict, Any
+
 import logging
+from typing import Any, Dict, Tuple, Union
+
+import numpy as np
+import pandas as pd
+from pandera import Check, Column
+from pandera import pandas as pa
 
 # Optional: Configure logging to see reports in your console/notebook output
 logging.basicConfig(
@@ -21,7 +25,9 @@ logging.basicConfig(
 REQUIRED_COLS = ["ticker", "ts", "open", "high", "low", "close", "volume"]
 
 
-def clean_stock_bars(df: pd.DataFrame, column_delete_threshold: float = 0.5) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+def clean_stock_bars(
+    df: pd.DataFrame, column_delete_threshold: float = 0.5
+) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
     No-exception cleaner:
      - keeps tz-aware UTC in 'ts'
@@ -70,7 +76,7 @@ def clean_stock_bars(df: pd.DataFrame, column_delete_threshold: float = 0.5) -> 
     rep["clean"]["null_handling"] = {
         "threshold": column_delete_threshold,
         "columns_deleted": [],
-        "columns_imputed": {}
+        "columns_imputed": {},
     }
 
     total_rows = len(d)
@@ -83,21 +89,25 @@ def clean_stock_bars(df: pd.DataFrame, column_delete_threshold: float = 0.5) -> 
         if null_ratio > column_delete_threshold:
             # Delete column if null ratio exceeds threshold
             columns_to_delete.append(col)
-            rep["clean"]["null_handling"]["columns_deleted"].append({
-                "column": col,
-                "null_ratio": float(null_ratio),
-                "null_count": int(null_count)
-            })
+            rep["clean"]["null_handling"]["columns_deleted"].append(
+                {
+                    "column": col,
+                    "null_ratio": float(null_ratio),
+                    "null_count": int(null_count),
+                }
+            )
         elif null_count > 0:
             # Impute missing values if null ratio is within threshold
             imputation_info = {
                 "null_count": int(null_count),
                 "null_ratio": float(null_ratio),
-                "method": None
+                "method": None,
             }
 
             # Determine column type and impute accordingly
-            if pd.api.types.is_numeric_dtype(d[col]) and not pd.api.types.is_datetime64_any_dtype(d[col]):
+            if pd.api.types.is_numeric_dtype(
+                d[col]
+            ) and not pd.api.types.is_datetime64_any_dtype(d[col]):
                 # Numerical column: use normal distribution
                 non_null_values = d[col].dropna()
                 if len(non_null_values) > 0:
@@ -112,11 +122,15 @@ def clean_stock_bars(df: pd.DataFrame, column_delete_threshold: float = 0.5) -> 
                     d.loc[d[col].isna(), col] = imputed_values
                     imputation_info["method"] = "normal_distribution"
                     imputation_info["mean"] = float(mean_val)
-                    imputation_info["std"] = float(std_val) if not pd.isna(std_val) else 0.0
+                    imputation_info["std"] = (
+                        float(std_val) if not pd.isna(std_val) else 0.0
+                    )
 
             elif pd.api.types.is_datetime64_any_dtype(d[col]):
                 # Datetime column: use Unix epoch
-                unix_epoch = pd.Timestamp("1970-01-01", tz=d[col].dt.tz if hasattr(d[col].dt, 'tz') else None)
+                unix_epoch = pd.Timestamp(
+                    "1970-01-01", tz=d[col].dt.tz if hasattr(d[col].dt, "tz") else None
+                )
                 d.loc[d[col].isna(), col] = unix_epoch
                 imputation_info["method"] = "unix_epoch"
                 imputation_info["value"] = str(unix_epoch)
@@ -141,7 +155,9 @@ def clean_stock_bars(df: pd.DataFrame, column_delete_threshold: float = 0.5) -> 
     if not existing_required:
         # If all required columns were deleted, return empty DataFrame
         rep["clean"]["hard_rows_dropped"] = 0
-        rep["clean"]["warning"] = "All required columns were deleted due to high null ratio"
+        rep["clean"]["warning"] = (
+            "All required columns were deleted due to high null ratio"
+        )
         return pd.DataFrame(), rep
 
     # Build keep_mask based on which columns still exist
@@ -197,8 +213,6 @@ def clean_stock_bars(df: pd.DataFrame, column_delete_threshold: float = 0.5) -> 
 
 def get_default_schema_config() -> Dict[str, Any]:
     """Returns the default validation schema configuration for stock bars."""
-    import pandera as pa
-    from pandera import Column, Check
 
     # Vectorized checks for better performance
     is_tz_aware = Check(
@@ -267,16 +281,8 @@ def get_default_schema_config() -> Dict[str, Any]:
 def pandera_validate_safely(
     df: pd.DataFrame, schema_config: Dict[str, Any] = None
 ) -> Dict[str, Any]:
-    """If pandera is installed, validate using a flexible schema. Never raises."""
+    """Validate using a flexible schema. Never raises."""
     info: Dict[str, Any] = {"pandera": {"enabled": False, "status": "skipped"}}
-    try:
-        import pandera as pa
-    except Exception as e:
-        info["pandera"] = {
-            "enabled": False,
-            "status": f"not_installed_or_import_failed: {e}",
-        }
-        return info
 
     if schema_config is None:
         schema_config = get_default_schema_config()
