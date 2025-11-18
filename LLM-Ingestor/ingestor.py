@@ -37,7 +37,7 @@ class Ingestor:
         openai_api_key: str,
         polygon_api_key: str,
         alpha_vantage_api_key: str,
-        openai_model: str = "gpt-4o-mini",
+        openai_model: str = "gpt-5-nano",
         temperature: float = None,
         semantic_threshold: float = 0.7
     ):
