@@ -1,5 +1,6 @@
 """
 Polygon Client - Updated with column normalization
+UPDATED: Timestamp kept as column (not index), ticker added as column
 """
 import time
 import pandas as pd
@@ -8,7 +9,7 @@ from base_api_client import BaseAPIClient
 from polygon import RESTClient
 
 
-# Column mapping for Polygon: short codes â†’ standard names
+# Column mapping for Polygon: short codes → standard names
 POLYGON_COLUMN_MAP = {
     "o": "open",
     "h": "high",
@@ -79,7 +80,7 @@ class PolygonClient(BaseAPIClient):
     def parse_response(self, response_package: Dict[str, Any]) -> pd.DataFrame:
         """
         Parse raw response into DataFrame with normalized column names
-        UPDATED: Now normalizes Polygon's short column codes to standard names
+        UPDATED: Timestamp kept as column (not index), ticker added as column
         """
         raw = response_package['data']
         params = response_package['features']
@@ -97,9 +98,13 @@ class PolygonClient(BaseAPIClient):
         # *** NORMALIZE COLUMN NAMES ***
         df.rename(columns=POLYGON_COLUMN_MAP, inplace=True)
         
-        # Handle timestamp if present
+        # Handle timestamp - convert to UTC datetime and KEEP AS COLUMN (not index)
         if "timestamp" in df.columns:
             df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
-            df.set_index("timestamp", inplace=True)
+        
+        # Add ticker column
+        ticker = params.get('ticker') or params.get('symbol')
+        if ticker:
+            df.insert(0, 'ticker', ticker)
         
         return df

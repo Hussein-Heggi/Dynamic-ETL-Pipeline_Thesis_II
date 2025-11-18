@@ -117,7 +117,7 @@ class AlphaVantageClient(BaseAPIClient):
 
         Returns:
             Tuple[pd.DataFrame, List[str]]: A tuple containing:
-                - A Pandas DataFrame with datetime index and columns for the requested features (e.g., open, high, low, close, volume).
+                - A Pandas DataFrame with timestamp column (UTC), ticker column, and OHLCV columns.
                 - A list of strings representing the column names present in the returned DataFrame.
 
         Raises:
@@ -151,23 +151,36 @@ class AlphaVantageClient(BaseAPIClient):
             # Rename columns to remove Alpha Vantage prefixes (e.g., "1. open" -> "open") [5]
             df.rename(columns=lambda x: x.split('. ')[1] if '. ' in x else x, inplace=True)
 
-            # Convert index to datetime objects and sort chronologically
+            # Convert index to datetime and create timestamp column (UTC)
             df.index = pd.to_datetime(df.index)
-            df.sort_index(inplace=True)
+            df = df.reset_index()
+            df.rename(columns={'index': 'timestamp'}, inplace=True)
+            
+            # Ensure timestamp is timezone-aware UTC
+            if df['timestamp'].dt.tz is None:
+                df['timestamp'] = df['timestamp'].dt.tz_localize('UTC')
+            
+            # Sort by timestamp
+            df.sort_values('timestamp', inplace=True)
+            df.reset_index(drop=True, inplace=True)
 
             # Select only the standard columns that are actually present after renaming
             available_standard_cols = [col for col in self._standard_columns if col in df.columns]
-            df = df[available_standard_cols]
 
             # Convert OHLCV columns to numeric types, coercing errors to NaN
             for col in available_standard_cols:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
 
             # Filter to only the columns requested by the user (if specified) that are available
-            final_columns = [col for col in columns_to_include if col in df.columns]
-            df = df[final_columns] # Keep only the requested & available columns
+            final_columns = ['timestamp'] + [col for col in columns_to_include if col in df.columns]
+            df = df[final_columns] # Keep only timestamp + requested & available columns
 
-            return df
+            # Add ticker column at the beginning
+            ticker = requested_features.get('ticker') or requested_features.get('symbol')
+            if ticker:
+                df.insert(0, 'ticker', ticker)
+
+            return df, list(df.columns)
 
         except Exception as e:
             print(f"Error parsing Alpha Vantage response: {e}")

@@ -11,7 +11,7 @@ def main():
     
     # Configuration
     config = {
-        
+
     }
     
     print("Initializing Financial Data Ingestor...")
@@ -31,16 +31,16 @@ def main():
     examples = [
         # Stock data examples
         "Show me Apple's daily stock price for the last 30 days",
-        "Get Tesla and Microsoft weekly data for the past 3 months",
-        "I need AAPL intraday prices from January 1, 2024 to January 15, 2024",
+       # "Get Tesla and Microsoft weekly data for the past 3 months",
+       # "I need AAPL intraday prices from January 1, 2024 to January 15, 2024",
         
         # Stock data with technical indicators
-        "Show me NVDA daily prices with 20-day and 50-day moving averages",
-        "Get Apple stock with RSI and MACD indicators for the past month",
+       # "Show me NVDA daily prices with 20-day and 50-day moving averages",
+       # "Get Apple stock with RSI and MACD indicators for the past month",
         
         # Economic indicator examples
-        "Show me US GDP growth for the last 5 years",
-        "Get the unemployment rate data quarterly",
+       # "Show me US GDP growth for the last 5 years",
+       # "Get the unemployment rate data quarterly",
     ]
     
     print("=" * 80)
