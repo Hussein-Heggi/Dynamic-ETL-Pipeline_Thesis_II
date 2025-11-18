@@ -9,13 +9,13 @@ import time
 from typing import List, Tuple
 import pandas as pd
 
-from contracts import (
+from .contracts import (
     APIRequest, ExecutionPlan, ExecutionResults, APIResult, ValidationReport
 )
-from query_analyzer import QueryAnalyzer
-from endpoint_validator import EndpointValidator
-from parameter_validator import ParameterValidator
-from output_validator import OutputValidator
+from .query_analyzer import QueryAnalyzer
+from .endpoint_validator import EndpointValidator
+from .parameter_validator import ParameterValidator
+from .output_validator import OutputValidator
 
 
 class Ingestor:
@@ -34,9 +34,9 @@ class Ingestor:
     
     def __init__(
         self,
-        openai_api_key: str,
-        polygon_api_key: str,
-        alpha_vantage_api_key: str,
+        openai_api_key: str="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",
+        polygon_api_key: str="pEP9v2lGpSGlWpMrWdHXqprZsV5MYYbc",
+        alpha_vantage_api_key: str="HP3O1J0U3CVNFOEH",
         openai_model: str = "gpt-5-nano",
         temperature: float = None,
         semantic_threshold: float = 0.7
@@ -62,8 +62,8 @@ class Ingestor:
         self.current_query = ""
         
         # Initialize API clients
-        from polygon_client import PolygonClient
-        from alpha_vantage_client import AlphaVantageClient
+        from .polygon_client import PolygonClient
+        from .alpha_vantage_client import AlphaVantageClient
         
         self.clients = {
             'polygon': PolygonClient(api_key=polygon_api_key),

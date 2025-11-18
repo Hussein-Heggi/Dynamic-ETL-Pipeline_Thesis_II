@@ -5,7 +5,7 @@ UPDATED: Timestamp kept as column (not index), ticker added as column
 import time
 import pandas as pd
 from typing import Dict, Any
-from base_api_client import BaseAPIClient
+from .base_api_client import BaseAPIClient
 from polygon import RESTClient
 
 

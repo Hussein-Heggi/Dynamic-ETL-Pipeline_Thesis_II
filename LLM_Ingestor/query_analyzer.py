@@ -8,8 +8,8 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional
 from openai import OpenAI
-from contracts import LLMResponse, FeatureSpec, LLMAPIRequest
-from api_registry import registry
+from .contracts import LLMResponse, FeatureSpec, LLMAPIRequest
+from .api_registry import registry
 
 
 class QueryAnalyzer:

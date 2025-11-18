@@ -11,7 +11,7 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 import time
 
-from config import ValidatorConfig
+from .config import ValidatorConfig
 
 # GPU imports (optional, will fallback to CPU if not available)
 try:

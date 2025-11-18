@@ -3,7 +3,7 @@ Main entry point - Demonstrates the financial data ETL pipeline.
 UPDATED: Handles new return signature (dataframes, enrichment_features, key_features, validation_reports)
 """
 import os
-from ingestor import Ingestor
+from .ingestor import Ingestor
 
 
 def main():

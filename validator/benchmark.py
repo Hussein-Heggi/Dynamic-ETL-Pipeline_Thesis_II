@@ -5,8 +5,8 @@ Benchmark script to measure performance of each stage
 import pandas as pd
 import numpy as np
 import time
-from join import JoinEngine
-from config import ValidatorConfig
+from .join import JoinEngine
+from .config import ValidatorConfig
 
 print("=" * 70)
 print("JOIN ENGINE PERFORMANCE BENCHMARK")

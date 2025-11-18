@@ -1,7 +1,7 @@
 import requests
 import pandas as pd
 from typing import Dict, Any, List, Tuple
-from base_api_client import BaseAPIClient
+from .base_api_client import BaseAPIClient
 
 class AlphaVantageClient(BaseAPIClient):
     """

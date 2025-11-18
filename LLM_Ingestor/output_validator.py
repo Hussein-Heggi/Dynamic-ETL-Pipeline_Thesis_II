@@ -4,7 +4,7 @@ OutputValidator - Validates that requested features exist in returned DataFrames
 import pandas as pd
 from typing import List, Dict, Any
 from difflib import SequenceMatcher
-from contracts import ValidationReport
+from .contracts import ValidationReport
 
 
 class OutputValidator:

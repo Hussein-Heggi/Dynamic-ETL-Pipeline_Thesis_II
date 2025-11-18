@@ -6,8 +6,8 @@ from datetime import datetime
 from typing import Dict, Any, List
 import re
 
-from contracts import APIRequest, ExecutionPlan
-from api_registry import registry, ParameterType
+from .contracts import APIRequest, ExecutionPlan
+from .api_registry import registry, ParameterType
 
 
 class ParameterValidator:

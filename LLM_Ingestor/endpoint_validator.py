@@ -6,8 +6,8 @@ import numpy as np
 from typing import List
 from sentence_transformers import SentenceTransformer
 import faiss
-from contracts import APIRequest, ExecutionPlan
-from api_registry import registry
+from .contracts import APIRequest, ExecutionPlan
+from .api_registry import registry
 
 
 class EndpointValidator:
