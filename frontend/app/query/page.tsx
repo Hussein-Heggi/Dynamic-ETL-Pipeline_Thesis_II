@@ -16,12 +16,35 @@ const exampleQueries = [
   'Show me Google stock with RSI indicator for the past month',
 ];
 
+const qualityProfiles = [
+  {
+    id: 'high_quality',
+    label: 'High Quality',
+    description: 'Strictest thresholds, fewer but highly accurate matches.',
+  },
+  {
+    id: 'balanced',
+    label: 'Balanced',
+    description: 'Default mix of accuracy and coverage for most use cases.',
+  },
+  {
+    id: 'high_volume',
+    label: 'High Volume',
+    description: 'Looser thresholds to maximize joins/unions on large datasets.',
+  },
+];
+
 export default function QueryPage() {
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const [qualityProfile, setQualityProfile] = useState('balanced');
 
   const mutation = useMutation({
-    mutationFn: (query: string) => pipelineApi.runPipeline({ query }),
+    mutationFn: (payload: { query: string; profile: string }) =>
+      pipelineApi.runPipeline({
+        query: payload.query,
+        options: { quality_profile: payload.profile },
+      }),
     onSuccess: (data) => {
       router.push(`/results/${data.run_id}`);
     },
@@ -30,7 +53,7 @@ export default function QueryPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      mutation.mutate(query);
+      mutation.mutate({ query, profile: qualityProfile });
     }
   };
 
@@ -67,6 +90,31 @@ export default function QueryPage() {
               className="min-h-[120px] text-base"
               disabled={mutation.isPending}
             />
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-gray-700">Validation profile</p>
+              <div className="space-y-2">
+                {qualityProfiles.map((profile) => (
+                  <label
+                    key={profile.id}
+                    className={`flex items-start space-x-3 border rounded-lg p-3 cursor-pointer transition ${
+                      qualityProfile === profile.id ? 'border-blue-500 bg-blue-50' : 'hover:border-blue-300'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border-gray-300"
+                      checked={qualityProfile === profile.id}
+                      onChange={() => setQualityProfile(profile.id)}
+                      disabled={mutation.isPending}
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900">{profile.label}</p>
+                      <p className="text-sm text-gray-600">{profile.description}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
 
             <div className="flex justify-between items-center">
               <p className="text-sm text-gray-500">

@@ -21,6 +21,7 @@ export interface StageFlags {
 
 export interface PipelineStatusResponse {
   run_id: string;
+  query: string;
   status: string;
   progress: number;
   current_stage: string;

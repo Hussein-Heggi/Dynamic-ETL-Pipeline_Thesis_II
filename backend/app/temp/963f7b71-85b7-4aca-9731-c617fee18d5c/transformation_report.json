@@ -1,0 +1,125 @@
+{
+    "dataframes_processed": 1,
+    "results": [
+        {
+            "index": 0,
+            "original_shape": [
+                123,
+                10
+            ],
+            "keywords": [
+                "RSI_14"
+            ],
+            "cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 123,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "vwap",
+                        "timestamp",
+                        "transactions",
+                        "otc"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [
+                            {
+                                "column": "vwap",
+                                "null_ratio": 0.8130081300813008,
+                                "null_count": 100
+                            },
+                            {
+                                "column": "transactions",
+                                "null_ratio": 0.8130081300813008,
+                                "null_count": 100
+                            },
+                            {
+                                "column": "otc",
+                                "null_ratio": 1.0,
+                                "null_count": 123
+                            }
+                        ],
+                        "columns_imputed": {},
+                        "total_columns_deleted": 3
+                    },
+                    "hard_rows_dropped": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "failed: SchemaErrors",
+                    "details": "{\n    \"SCHEMA\": {\n        \"WRONG_DATATYPE\": [\n            {\n                \"schema\": null,\n                \"column\": \"volume\",\n                \"check\": \"dtype('int64')\",\n                \"error\": \"expected series 'volume' to have type int64, got float64\"\n            }\n        ]\n    }\n}"
+                }
+            },
+            "enrichment": {
+                "dsl_string": "{}",
+                "dsl": null,
+                "errors": [
+                    "Validation Error: JSON must have a top-level 'features' key."
+                ],
+                "success": false
+            },
+            "final_shape": [
+                123,
+                7
+            ],
+            "status": "partial_success",
+            "errors": [
+                "Validation Error: JSON must have a top-level 'features' key."
+            ],
+            "cleaned_shape": [
+                123,
+                7
+            ],
+            "post_enrichment_cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 123,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "timestamp"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [],
+                        "columns_imputed": {}
+                    },
+                    "hard_rows_dropped": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "failed: SchemaErrors",
+                    "details": "{\n    \"SCHEMA\": {\n        \"WRONG_DATATYPE\": [\n            {\n                \"schema\": null,\n                \"column\": \"volume\",\n                \"check\": \"dtype('int64')\",\n                \"error\": \"expected series 'volume' to have type int64, got float64\"\n            }\n        ]\n    }\n}"
+                }
+            },
+            "post_cleaned_shape": [
+                123,
+                7
+            ]
+        }
+    ],
+    "overall_status": "failure",
+    "total_errors": 1
+}

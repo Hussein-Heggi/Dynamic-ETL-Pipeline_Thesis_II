@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from LLM_Ingestor.ingestor import Ingestor
 from validator import Validator
+from validator.config import ValidatorConfig
 from transform.transform import transform_pipeline
 from app.models.schemas import PipelineStatus
 
@@ -21,15 +22,18 @@ class PipelineService:
         self.temp_dir.mkdir(exist_ok=True)
         self.runs: Dict[str, Dict[str, Any]] = {}  # In-memory storage for run metadata
 
-    def create_run(self, query: str) -> str:
+    def create_run(self, query: str, options: Dict[str, Any] | None = None) -> str:
         """Create a new pipeline run and return run_id"""
         run_id = str(uuid.uuid4())
         run_dir = self.temp_dir / run_id
         run_dir.mkdir(exist_ok=True)
+        options = options or {}
+        quality_profile = options.get("quality_profile") or ValidatorConfig.DEFAULT_QUALITY_PROFILE
 
         self.runs[run_id] = {
             "run_id": run_id,
             "query": query,
+            "options": options,
             "status": PipelineStatus.PENDING,
             "progress": 0,
             "current_stage": "pending",
@@ -38,6 +42,7 @@ class PipelineService:
             "completed_at": None,
             "error": None,
             "run_dir": str(run_dir),
+            "quality_profile": quality_profile,
             "stage_flags": {
                 "ingestion": False,
                 "validation": False,
@@ -92,11 +97,16 @@ class PipelineService:
         with open(path, "w") as f:
             json.dump(data, f, indent=4)
 
-    async def run_pipeline(self, run_id: str, query: str, websocket_callback=None):
+    async def run_pipeline(self, run_id: str, query: str, options: Dict[str, Any] | None = None, websocket_callback=None):
         """Execute the ETL pipeline"""
         run_dir = Path(self.runs[run_id]["run_dir"])
+        options = options or self.runs[run_id].get("options", {})
 
         try:
+            quality_profile = options.get("quality_profile") or self.runs[run_id].get("quality_profile")
+            config = ValidatorConfig(quality_profile=quality_profile)
+            self.runs[run_id]["quality_profile"] = config.current_quality_profile
+
             # Stage 1: Ingestion
             await self._send_update(
                 run_id,
@@ -154,7 +164,7 @@ class PipelineService:
                 "validation"
             )
 
-            validator = Validator()
+            validator = Validator(config=config)
             val_out, validation_report = await self._run_blocking(
                 validator.process,
                 dataframes
@@ -204,7 +214,8 @@ class PipelineService:
             trans_out, transformation_report = await self._run_blocking(
                 transform_pipeline,
                 val_out,
-                enrichment_features
+                enrichment_features,
+                column_delete_threshold=config.COLUMN_DELETE_THRESHOLD
             )
 
             for i, df in enumerate(trans_out):

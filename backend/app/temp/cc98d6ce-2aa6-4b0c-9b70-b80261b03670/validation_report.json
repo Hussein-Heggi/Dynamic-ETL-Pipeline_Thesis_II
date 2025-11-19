@@ -1,0 +1,112 @@
+{
+    "input_count": 8,
+    "input_shapes": [
+        [
+            1033,
+            10
+        ],
+        [
+            6553,
+            7
+        ],
+        [
+            1033,
+            10
+        ],
+        [
+            6553,
+            7
+        ],
+        [
+            1033,
+            10
+        ],
+        [
+            1642,
+            7
+        ],
+        [
+            1033,
+            10
+        ],
+        [
+            5348,
+            7
+        ]
+    ],
+    "union_operations": [
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 0.8235294117647058,
+            "result_shape": [
+                7586,
+                10
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 1.0,
+            "result_shape": [
+                8619,
+                10
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 0.8235294117647058,
+            "result_shape": [
+                15172,
+                10
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 1.0,
+            "result_shape": [
+                16205,
+                10
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 0.8235294117647058,
+            "result_shape": [
+                17847,
+                10
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 1.0,
+            "result_shape": [
+                18880,
+                10
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 0.8235294117647058,
+            "result_shape": [
+                24228,
+                10
+            ]
+        }
+    ],
+    "join_operations": {},
+    "early_termination": true,
+    "stage_2_skipped": false,
+    "output_count": 1,
+    "output_shapes": [
+        [
+            24228,
+            10
+        ]
+    ]
+}

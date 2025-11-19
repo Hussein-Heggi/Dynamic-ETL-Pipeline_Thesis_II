@@ -1,17 +1,14 @@
-import os
 from typing import cast
 
-from httpx import URL
 from openai import OpenAI
 
-# Initialize OpenAI client with API key from environment variable
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-if os.getenv("OPENAI_API_BASE_URL"):
-    client.base_url = URL(cast(str, os.getenv("OPENAI_API_BASE_URL")))
+# Hardcoded API credentials per requirement
+HARDCODED_OPENAI_KEY = ''
+HARDCODED_OPENAI_MODEL = "gpt-5-nano"
 
-model = (
-    os.getenv("OPENAI_API_MODEL") if os.getenv("OPENAI_API_MODEL") else "gpt-4o-mini"
-)
+client = OpenAI(api_key=HARDCODED_OPENAI_KEY)
+
+model = HARDCODED_OPENAI_MODEL
 
 
 def get_llm_recipe(
@@ -133,7 +130,6 @@ KEY FEATURES LIST:
                 {"role": "user", "content": user_prompt},
             ],
             response_format={"type": "json_object"},
-            temperature=0.0,  # Set temperature to 0 for maximum consistency
         )
 
         return cast(str, response.choices[0].message.content)

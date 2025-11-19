@@ -23,6 +23,7 @@ class PipelineRunResponse(BaseModel):
 
 class PipelineStatusResponse(BaseModel):
     run_id: str
+    query: str
     status: PipelineStatus
     progress: int  # 0-100
     current_stage: str

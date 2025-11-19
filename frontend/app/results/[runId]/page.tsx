@@ -133,10 +133,10 @@ useEffect(() => {
     return 'pending';
   };
 
-  const StageIndicator = ({ stage, label }: { stage: StageKey; label: string }) => {
-    const stageStatus = getStageStatus(stage);
+const StageIndicator = ({ stage, label }: { stage: StageKey; label: string }) => {
+  const stageStatus = getStageStatus(stage);
 
-    return (
+  return (
       <div className="flex flex-col items-center space-y-2">
         <div
           className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
@@ -169,8 +169,294 @@ useEffect(() => {
           {label}
         </span>
       </div>
-    );
-  };
+  );
+};
+
+const formatShape = (shape?: [number, number]) => {
+  if (!shape || shape.length < 2) return 'Unknown shape';
+  return `${shape[0]} rows × ${shape[1]} columns`;
+};
+
+const formatNullHandling = (nullHandling?: any) => {
+  if (!nullHandling) return null;
+  const deleted =
+    nullHandling.columns_deleted?.length > 0
+      ? `${nullHandling.columns_deleted.length} column(s) dropped (${nullHandling.columns_deleted
+          .map((col: any) => `${col.column} ${(col.null_ratio * 100).toFixed(1)}%`)
+          .join(', ')})`
+      : 'No columns dropped';
+
+  const imputedEntries = Object.entries(nullHandling.columns_imputed || {});
+  const imputed =
+    imputedEntries.length > 0
+      ? `${imputedEntries.length} column(s) imputed (${imputedEntries
+          .map(([col, info]: [string, any]) => `${col} (${info.method})`)
+          .join(', ')})`
+      : 'No imputation needed';
+
+  return { deleted, imputed };
+};
+
+const formatWarnings = (warnings?: any) => {
+  if (!warnings) return [];
+  const entries: string[] = [];
+  Object.entries(warnings).forEach(([key, value]) => {
+    entries.push(`${key.replaceAll('_', ' ')}: ${value}`);
+  });
+  return entries;
+};
+
+const formatErrors = <T,>(errors?: T[]) =>
+  errors && errors.length > 0 ? (
+    <ul className="list-disc ml-5">
+      {errors.map((err: any, idx: number) => (
+        <li key={idx}>{typeof err === 'string' ? err : JSON.stringify(err)}</li>
+      ))}
+    </ul>
+  ) : null;
+
+const SummaryStat = ({ title, value, subtitle }: { title: string; value: string | number; subtitle?: string }) => (
+  <div className="p-4 border rounded-lg bg-gray-50">
+    <p className="text-sm font-medium text-gray-500">{title}</p>
+    <p className="text-2xl font-semibold text-gray-900">{value}</p>
+    {subtitle && <p className="text-sm text-gray-600 mt-1">{subtitle}</p>}
+  </div>
+);
+
+const getJoinSummary = (value: any) => {
+  if (!value) return 'Executed';
+  if (Array.isArray(value)) {
+    const count = value.length;
+    return `${count} match group${count === 1 ? '' : 's'}`;
+  }
+  if (typeof value === 'object') {
+    if (typeof value.summary === 'string') return value.summary;
+    const keys = Object.keys(value);
+    if (keys.length === 0) return 'Executed';
+    return keys
+      .map((key) => `${key.replaceAll('_', ' ')}: ${JSON.stringify(value[key])}`)
+      .join(', ');
+  }
+  return String(value);
+};
+
+const ValidationSummary = ({ report }: { report: any }) => {
+  const inputShapes = (report.input_shapes || []).map(formatShape).join(', ');
+  const outputShapes = (report.output_shapes || []).map(formatShape).join(', ');
+  const unionOps = report.union_operations || [];
+  const joinEntries = Object.entries(report.join_operations || {}).filter(
+    ([, value]) =>
+      value &&
+      ((Array.isArray(value) && value.length > 0) ||
+        (typeof value === 'object' && Object.keys(value).length > 0))
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <SummaryStat
+          title="Input Tables"
+          value={report.input_count ?? '--'}
+          subtitle={inputShapes ? `Shapes: ${inputShapes}` : undefined}
+        />
+        <SummaryStat
+          title="Outputs"
+          value={report.output_count ?? '--'}
+          subtitle={outputShapes ? `Shapes: ${outputShapes}` : undefined}
+        />
+        <SummaryStat
+          title="Union Ops"
+          value={unionOps.length}
+          subtitle={unionOps.length > 0 ? 'See details below' : 'No unions were needed'}
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <Badge variant={report.early_termination ? 'default' : 'outline'}>
+          Early termination: {report.early_termination ? 'Yes' : 'No'}
+        </Badge>
+        <Badge variant={report.stage_2_skipped ? 'outline' : 'default'}>
+          Stage 2 skipped: {report.stage_2_skipped ? 'Yes' : 'No'}
+        </Badge>
+      </div>
+
+      <div className="space-y-4">
+        <h4 className="text-sm font-semibold text-gray-800">Union Operations</h4>
+        {unionOps.length > 0 ? (
+          <div className="space-y-3">
+            {unionOps.map((op: any, idx: number) => (
+              <div key={idx} className="border rounded-lg p-3">
+                <p className="font-medium text-gray-900">{op.group || `Union ${idx + 1}`}</p>
+                <p className="text-sm text-gray-600">
+                  Score: {typeof op.score === 'number' ? op.score.toFixed(2) : op.score ?? 'n/a'}
+                </p>
+                {op.result_shape && (
+                  <p className="text-sm text-gray-600">Result shape: {formatShape(op.result_shape)}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">No unions performed in this run.</p>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <h4 className="text-sm font-semibold text-gray-800">Join Operations</h4>
+        {joinEntries.length > 0 ? (
+          <div className="space-y-3">
+            {joinEntries.map(([stage, value]) => (
+              <div key={stage} className="border rounded-lg p-3">
+                <p className="font-medium text-gray-900">{stage}</p>
+                <p className="text-sm text-gray-600">{getJoinSummary(value)}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">No joins were executed.</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const TransformationSummary = ({ report }: { report: any }) => {
+  const results = report.results || [];
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <SummaryStat title="Dataframes Processed" value={report.dataframes_processed ?? results.length} />
+        <SummaryStat title="Overall Status" value={report.overall_status ?? 'Unknown'} />
+        <SummaryStat title="Total Errors" value={report.total_errors ?? 0} />
+      </div>
+
+      {results.length === 0 && <p className="text-sm text-gray-600">No transformation details are available.</p>}
+
+      <div className="space-y-4">
+        {results.map((result: any, idx: number) => (
+          <div key={`${result.index}-${idx}`} className="border rounded-lg p-4 space-y-2">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-semibold text-gray-900">Output Dataset {result.index}</p>
+                <p className="text-sm text-gray-600">
+                  {formatShape(result.original_shape)} → {formatShape(result.final_shape || result.cleaned_shape)}
+                </p>
+              </div>
+              <Badge
+                variant={
+                  result.status === 'success'
+                    ? 'default'
+                    : result.status === 'failure'
+                    ? 'destructive'
+                    : 'secondary'
+                }
+              >
+                {result.status || 'unknown'}
+              </Badge>
+            </div>
+            {result.keywords?.length > 0 && (
+              <p className="text-sm text-gray-700">
+                Keywords: <span className="font-medium text-gray-900">{result.keywords.join(', ')}</span>
+              </p>
+            )}
+            {result.cleaning && (
+              <div className="text-sm text-gray-600 space-y-1">
+                <p className="font-medium text-gray-800">Initial cleaning</p>
+                {result.cleaning.missing_required_columns?.length > 0 && (
+                  <p>Missing required columns: {result.cleaning.missing_required_columns.join(', ')}</p>
+                )}
+                {formatWarnings(result.cleaning.warnings).length > 0 && (
+                  <div>
+                    <p className="font-medium text-gray-700">Warnings</p>
+                    <ul className="list-disc ml-5">
+                      {formatWarnings(result.cleaning.warnings).map((warning, idx) => (
+                        <li key={idx}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {result.cleaning.null_handling && (() => {
+                  const info = formatNullHandling(result.cleaning.null_handling);
+                  if (!info) return null;
+                  return (
+                    <>
+                      <p>Null threshold: {result.cleaning.null_handling.threshold ?? 'n/a'}</p>
+                      <p>{info.deleted}</p>
+                      <p>{info.imputed}</p>
+                    </>
+                  );
+                })()}
+                {result.cleaning.pandera && (
+                  <p>
+                    Pandera validation:{' '}
+                    <span className={result.cleaning.pandera.status?.includes('failed') ? 'text-red-600' : 'text-green-600'}>
+                      {result.cleaning.pandera.status}
+                    </span>
+                  </p>
+                )}
+              </div>
+            )}
+            {result.enrichment && (
+              <div className="text-sm space-y-1">
+                <p className="font-medium text-gray-800">Enrichment</p>
+                <p className={result.enrichment.success ? 'text-gray-600' : 'text-red-600'}>
+                  Status: {result.enrichment.success ? 'Successful' : 'Failed'}
+                </p>
+                {result.enrichment.dsl_string && (
+                  <pre className="bg-gray-900 text-gray-100 rounded p-2 text-xs overflow-x-auto">
+                    {result.enrichment.dsl_string}
+                  </pre>
+                )}
+                {result.enrichment.errors?.length > 0 && (
+                  <div className="text-red-600">
+                    <p className="font-medium">Errors</p>
+                    {formatErrors(result.enrichment.errors)}
+                  </div>
+                )}
+              </div>
+            )}
+            {result.errors?.length > 0 && (
+              <div className="text-sm text-red-600">
+                <p className="font-medium text-red-700">Pipeline errors</p>
+                {formatErrors(result.errors)}
+              </div>
+            )}
+            {result.post_enrichment_cleaning && (
+              <div className="text-sm text-gray-600 space-y-1">
+                <p className="font-medium text-gray-800">Post-enrichment cleaning</p>
+                {result.post_enrichment_cleaning.null_handling && (() => {
+                  const info = formatNullHandling(result.post_enrichment_cleaning.null_handling);
+                  if (!info) return null;
+                  return (
+                    <>
+                      <p>Null threshold: {result.post_enrichment_cleaning.null_handling.threshold ?? 'n/a'}</p>
+                      <p>{info.deleted}</p>
+                      <p>{info.imputed}</p>
+                    </>
+                  );
+                })()}
+                {result.post_enrichment_cleaning.pandera && (
+                  <p>
+                    Pandera validation:{' '}
+                    <span
+                      className={
+                        result.post_enrichment_cleaning.pandera.status?.includes('failed')
+                          ? 'text-red-600'
+                          : 'text-green-600'
+                      }
+                    >
+                      {result.post_enrichment_cleaning.pandera.status}
+                    </span>
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -192,7 +478,12 @@ useEffect(() => {
             </Badge>
           )}
         </div>
-        <p className="text-gray-600">Run ID: {runId}</p>
+        {status?.query && (
+          <p className="text-gray-600">
+            <span className="font-semibold text-gray-700">Prompt:</span>{' '}
+            <span>{status.query}</span>
+          </p>
+        )}
       </div>
 
       <Card>
@@ -317,12 +608,15 @@ useEffect(() => {
           <TabsContent value="validation">
             <Card>
               <CardHeader>
-                <CardTitle>Validation Report</CardTitle>
+                <CardTitle>Validation Insights</CardTitle>
+                <CardDescription>Key takeaways from the union/join stages</CardDescription>
               </CardHeader>
               <CardContent>
-                <pre className="bg-gray-900 text-gray-100 p-4 rounded overflow-x-auto text-sm">
-                  {JSON.stringify(results.validation_report, null, 2)}
-                </pre>
+                {results.validation_report ? (
+                  <ValidationSummary report={results.validation_report} />
+                ) : (
+                  <p className="text-sm text-gray-600">Validation report is not available yet.</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -330,12 +624,15 @@ useEffect(() => {
           <TabsContent value="transformation">
             <Card>
               <CardHeader>
-                <CardTitle>Transformation Report</CardTitle>
+                <CardTitle>Transformation Insights</CardTitle>
+                <CardDescription>Cleaning and enrichment outcomes for each dataframe</CardDescription>
               </CardHeader>
               <CardContent>
-                <pre className="bg-gray-900 text-gray-100 p-4 rounded overflow-x-auto text-sm">
-                  {JSON.stringify(results.transformation_report, null, 2)}
-                </pre>
+                {results.transformation_report ? (
+                  <TransformationSummary report={results.transformation_report} />
+                ) : (
+                  <p className="text-sm text-gray-600">Transformation report is not available yet.</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -356,7 +653,7 @@ useEffect(() => {
                     >
                       <Button variant="outline" className="w-full justify-start">
                         <Download className="h-4 w-4 mr-2" />
-                        Download DataFrame {idx} (CSV)
+                        Download Output {idx} (CSV)
                       </Button>
                     </a>
                   ))}

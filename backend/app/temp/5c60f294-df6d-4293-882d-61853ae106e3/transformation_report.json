@@ -1,0 +1,140 @@
+{
+    "dataframes_processed": 1,
+    "results": [
+        {
+            "index": 0,
+            "original_shape": [
+                6576,
+                10
+            ],
+            "keywords": [
+                "SMA_10"
+            ],
+            "cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 6576,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "vwap",
+                        "timestamp",
+                        "transactions",
+                        "otc"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [
+                            {
+                                "column": "vwap",
+                                "null_ratio": 0.9965024330900243,
+                                "null_count": 6553
+                            },
+                            {
+                                "column": "transactions",
+                                "null_ratio": 0.9965024330900243,
+                                "null_count": 6553
+                            },
+                            {
+                                "column": "otc",
+                                "null_ratio": 1.0,
+                                "null_count": 6576
+                            }
+                        ],
+                        "columns_imputed": {},
+                        "total_columns_deleted": 3
+                    },
+                    "hard_rows_dropped": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "failed: SchemaErrors",
+                    "details": "{\n    \"SCHEMA\": {\n        \"WRONG_DATATYPE\": [\n            {\n                \"schema\": null,\n                \"column\": \"volume\",\n                \"check\": \"dtype('int64')\",\n                \"error\": \"expected series 'volume' to have type int64, got float64\"\n            }\n        ]\n    }\n}"
+                }
+            },
+            "enrichment": {
+                "dsl_string": "{\n  \"features\": [\n    {\n      \"name\": \"sma\",\n      \"params\": {\n        \"on\": \"close\",\n        \"window\": 10\n      }\n    }\n  ]\n}",
+                "dsl": {
+                    "features": [
+                        {
+                            "name": "sma",
+                            "params": {
+                                "on": "close",
+                                "window": 10
+                            }
+                        }
+                    ]
+                },
+                "errors": [],
+                "success": true
+            },
+            "final_shape": [
+                6576,
+                8
+            ],
+            "status": "success",
+            "errors": [],
+            "cleaned_shape": [
+                6576,
+                7
+            ],
+            "post_enrichment_cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 6576,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "timestamp",
+                        "sma_close_10"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [],
+                        "columns_imputed": {
+                            "sma_close_10": {
+                                "null_count": 9,
+                                "null_ratio": 0.0013686131386861315,
+                                "method": "normal_distribution",
+                                "mean": 176.796075437795,
+                                "std": 142.22452800309588
+                            }
+                        }
+                    },
+                    "hard_rows_dropped": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "failed: SchemaErrors",
+                    "details": "{\n    \"SCHEMA\": {\n        \"WRONG_DATATYPE\": [\n            {\n                \"schema\": null,\n                \"column\": \"volume\",\n                \"check\": \"dtype('int64')\",\n                \"error\": \"expected series 'volume' to have type int64, got float64\"\n            }\n        ]\n    }\n}"
+                }
+            },
+            "post_cleaned_shape": [
+                6576,
+                8
+            ]
+        }
+    ],
+    "overall_status": "success",
+    "total_errors": 0
+}

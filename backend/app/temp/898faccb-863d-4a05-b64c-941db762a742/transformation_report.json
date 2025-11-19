@@ -1,0 +1,138 @@
+{
+    "dataframes_processed": 1,
+    "results": [
+        {
+            "index": 0,
+            "original_shape": [
+                6577,
+                10
+            ],
+            "keywords": [
+                "SMA_10"
+            ],
+            "cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 6577,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "vwap",
+                        "timestamp",
+                        "transactions",
+                        "otc"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [
+                            {
+                                "column": "vwap",
+                                "null_ratio": 0.9965029648776038,
+                                "null_count": 6554
+                            },
+                            {
+                                "column": "transactions",
+                                "null_ratio": 0.9965029648776038,
+                                "null_count": 6554
+                            },
+                            {
+                                "column": "otc",
+                                "null_ratio": 1.0,
+                                "null_count": 6577
+                            }
+                        ],
+                        "columns_imputed": {},
+                        "total_columns_deleted": 3
+                    },
+                    "hard_rows_dropped": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "passed"
+                }
+            },
+            "enrichment": {
+                "dsl_string": "{\n  \"features\": [\n    {\n      \"name\": \"sma\",\n      \"params\": {\n        \"on\": \"close\",\n        \"window\": 10\n      }\n    }\n  ]\n}",
+                "dsl": {
+                    "features": [
+                        {
+                            "name": "sma",
+                            "params": {
+                                "on": "close",
+                                "window": 10
+                            }
+                        }
+                    ]
+                },
+                "errors": [],
+                "success": true
+            },
+            "final_shape": [
+                6577,
+                8
+            ],
+            "status": "success",
+            "errors": [],
+            "cleaned_shape": [
+                6577,
+                7
+            ],
+            "post_enrichment_cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 6577,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "timestamp",
+                        "sma_close_10"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [],
+                        "columns_imputed": {
+                            "sma_close_10": {
+                                "null_count": 9,
+                                "null_ratio": 0.0013684050478941767,
+                                "method": "normal_distribution",
+                                "mean": 176.80994205237516,
+                                "std": 142.18746920715745
+                            }
+                        }
+                    },
+                    "hard_rows_dropped": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "passed"
+                }
+            },
+            "post_cleaned_shape": [
+                6577,
+                8
+            ]
+        }
+    ],
+    "overall_status": "success",
+    "total_errors": 0
+}

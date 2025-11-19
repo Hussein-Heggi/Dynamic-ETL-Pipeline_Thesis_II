@@ -198,6 +198,12 @@ def clean_stock_bars(
         bad_tx = d["transactions"].notna() & (d["transactions"] < 0)
         rep["clean"]["transactions_set_null"] = int(bad_tx.sum())
         d.loc[bad_tx, "transactions"] = pd.NA
+
+    # Ensure volume column uses integer dtype for downstream schema validation
+    if "volume" in d.columns:
+        d["volume"] = d["volume"].round().astype("Int64")
+
+    if "transactions" in d.columns:
         d["transactions"] = d["transactions"].astype("Int64")
 
     # Optional tidy & dtype align - only sort by columns that exist

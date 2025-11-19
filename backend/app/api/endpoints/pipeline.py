@@ -19,13 +19,14 @@ router = APIRouter()
 async def run_pipeline(request: QueryRequest, background_tasks: BackgroundTasks):
     """Start a new pipeline run"""
     try:
-        run_id = pipeline_service.create_run(request.query)
+        run_id = pipeline_service.create_run(request.query, request.options)
 
         # Run pipeline in background
         background_tasks.add_task(
             pipeline_service.run_pipeline,
             run_id,
-            request.query
+            request.query,
+            request.options or {}
         )
 
         run_info = pipeline_service.get_run_status(run_id)
@@ -49,6 +50,7 @@ async def get_pipeline_status(run_id: str):
 
     return PipelineStatusResponse(
         run_id=run_info["run_id"],
+        query=run_info["query"],
         status=run_info["status"],
         progress=run_info["progress"],
         current_stage=run_info["current_stage"],

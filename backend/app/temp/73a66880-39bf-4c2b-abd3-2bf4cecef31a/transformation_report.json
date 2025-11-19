@@ -1,0 +1,147 @@
+{
+    "dataframes_processed": 1,
+    "results": [
+        {
+            "index": 0,
+            "original_shape": [
+                123,
+                10
+            ],
+            "keywords": [
+                "SMA_10",
+                "DOUBLE_OPEN"
+            ],
+            "cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 123,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "vwap",
+                        "timestamp",
+                        "transactions",
+                        "otc"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.3,
+                        "columns_deleted": [
+                            {
+                                "column": "vwap",
+                                "null_ratio": 0.8130081300813008,
+                                "null_count": 100
+                            },
+                            {
+                                "column": "transactions",
+                                "null_ratio": 0.8130081300813008,
+                                "null_count": 100
+                            },
+                            {
+                                "column": "otc",
+                                "null_ratio": 1.0,
+                                "null_count": 123
+                            }
+                        ],
+                        "columns_imputed": {},
+                        "total_columns_deleted": 3
+                    },
+                    "hard_rows_dropped": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "passed"
+                }
+            },
+            "enrichment": {
+                "dsl_string": "{\n  \"features\": [\n    {\n      \"name\": \"sma\",\n      \"params\": {\n        \"on\": \"close\",\n        \"window\": 10\n      }\n    },\n    {\n      \"name\": \"custom_double_open\",\n      \"params\": {\n        \"code\": \"series = g['open'] * 2\",\n        \"as\": \"double_open\"\n      }\n    }\n  ]\n}",
+                "dsl": {
+                    "features": [
+                        {
+                            "name": "sma",
+                            "params": {
+                                "on": "close",
+                                "window": 10
+                            }
+                        },
+                        {
+                            "name": "custom_double_open",
+                            "params": {
+                                "code": "series = g['open'] * 2",
+                                "as": "double_open"
+                            }
+                        }
+                    ]
+                },
+                "errors": [],
+                "success": true
+            },
+            "final_shape": [
+                123,
+                9
+            ],
+            "status": "success",
+            "errors": [],
+            "cleaned_shape": [
+                123,
+                7
+            ],
+            "post_enrichment_cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 123,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "timestamp",
+                        "sma_close_10",
+                        "double_open"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.3,
+                        "columns_deleted": [],
+                        "columns_imputed": {
+                            "sma_close_10": {
+                                "null_count": 9,
+                                "null_ratio": 0.07317073170731707,
+                                "method": "normal_distribution",
+                                "mean": 244.9486052631579,
+                                "std": 19.43591083655057
+                            }
+                        }
+                    },
+                    "hard_rows_dropped": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "passed"
+                }
+            },
+            "post_cleaned_shape": [
+                123,
+                9
+            ]
+        }
+    ],
+    "overall_status": "success",
+    "total_errors": 0
+}

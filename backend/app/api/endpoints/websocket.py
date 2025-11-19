@@ -54,6 +54,7 @@ async def websocket_endpoint(websocket: WebSocket, run_id: str):
                 pipeline_service.run_pipeline(
                     run_id,
                     run_info["query"],
+                    run_info.get("options", {}),
                     websocket_callback
                 )
             )

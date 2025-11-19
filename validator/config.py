@@ -6,6 +6,46 @@ Contains all thresholds, paths, and settings including parallel processing
 class ValidatorConfig:
     """Configuration class for Validator operations"""
     
+    # ==================== QUALITY PROFILES ====================
+    # Update the values in QUALITY_PROFILES to tweak each preset
+    QUALITY_PROFILES = {
+        "high_quality": {
+            "UNION_COMPATIBILITY_THRESHOLD": 0.7,
+            "JOIN_RETENTION_THRESHOLD": 0.65,
+            "MAX_MATCHES_PER_ROW": 2,
+            "COLUMN_DELETE_THRESHOLD": 0.3,
+        },
+        "balanced": {
+            "UNION_COMPATIBILITY_THRESHOLD": 0.6,
+            "JOIN_RETENTION_THRESHOLD": 0.5,
+            "MAX_MATCHES_PER_ROW": 5,
+            "COLUMN_DELETE_THRESHOLD": 0.5,
+        },
+        "high_volume": {
+            "UNION_COMPATIBILITY_THRESHOLD": 0.4,
+            "JOIN_RETENTION_THRESHOLD": 0.35,
+            "MAX_MATCHES_PER_ROW": 0,  # no limit
+            "COLUMN_DELETE_THRESHOLD": 0.7,
+        },
+    }
+    DEFAULT_QUALITY_PROFILE = "balanced"
+
+    def __init__(self, quality_profile: str | None = None):
+        self.current_quality_profile = self.DEFAULT_QUALITY_PROFILE
+        self.apply_quality_profile(quality_profile or self.DEFAULT_QUALITY_PROFILE)
+    
+    def apply_quality_profile(self, profile_name: str):
+        """Apply preset thresholds based on selected quality profile"""
+        preset = self.QUALITY_PROFILES.get(profile_name)
+        if not preset:
+            preset = self.QUALITY_PROFILES[self.DEFAULT_QUALITY_PROFILE]
+            profile_name = self.DEFAULT_QUALITY_PROFILE
+        self.current_quality_profile = profile_name
+        self.UNION_COMPATIBILITY_THRESHOLD = preset["UNION_COMPATIBILITY_THRESHOLD"]
+        self.JOIN_RETENTION_THRESHOLD = preset["JOIN_RETENTION_THRESHOLD"]
+        self.MAX_MATCHES_PER_ROW = preset["MAX_MATCHES_PER_ROW"]
+        self.COLUMN_DELETE_THRESHOLD = preset.get("COLUMN_DELETE_THRESHOLD", 0.5)
+    
     # ==================== THRESHOLDS ====================
     
     # Union thresholds
@@ -16,8 +56,9 @@ class ValidatorConfig:
     
     # Join thresholds
     JOIN_ROW_THRESHOLD = 0.44  # Minimum XGBoost probability for row pair
-    JOIN_RETENTION_THRESHOLD = 0.2  # Minimum retention ratio (matched_rows / denominator)
+    JOIN_RETENTION_THRESHOLD = 0.5  # Minimum retention ratio (matched_rows / denominator)
     MAX_MATCHES_PER_ROW = 5  # Maximum matches per row in many-to-many join (0 = unlimited)
+    COLUMN_DELETE_THRESHOLD = 0.5  # Ratio threshold for dropping high-null columns
     
     # ==================== MODEL PATHS ====================
     
