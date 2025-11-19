@@ -1,0 +1,47 @@
+{
+    "input_count": 3,
+    "input_shapes": [
+        [
+            11,
+            10
+        ],
+        [
+            11,
+            10
+        ],
+        [
+            11,
+            10
+        ]
+    ],
+    "union_operations": [
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 1.0,
+            "result_shape": [
+                22,
+                10
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 1.0,
+            "result_shape": [
+                33,
+                10
+            ]
+        }
+    ],
+    "join_operations": {},
+    "early_termination": true,
+    "stage_2_skipped": false,
+    "output_count": 1,
+    "output_shapes": [
+        [
+            33,
+            10
+        ]
+    ]
+}

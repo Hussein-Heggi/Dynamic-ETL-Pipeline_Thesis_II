@@ -1,0 +1,135 @@
+{
+    "dataframes_processed": 1,
+    "results": [
+        {
+            "index": 0,
+            "original_shape": [
+                23,
+                10
+            ],
+            "keywords": [
+                "RSI_14"
+            ],
+            "cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 23,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "vwap",
+                        "timestamp",
+                        "transactions",
+                        "otc"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [
+                            {
+                                "column": "otc",
+                                "null_ratio": 1.0,
+                                "null_count": 23
+                            }
+                        ],
+                        "columns_imputed": {},
+                        "total_columns_deleted": 1
+                    },
+                    "hard_rows_dropped": 0,
+                    "vwap_set_null": 0,
+                    "transactions_set_null": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "failed: SchemaErrors",
+                    "details": "{\n    \"SCHEMA\": {\n        \"WRONG_DATATYPE\": [\n            {\n                \"schema\": null,\n                \"column\": \"volume\",\n                \"check\": \"dtype('int64')\",\n                \"error\": \"expected series 'volume' to have type int64, got float64\"\n            }\n        ]\n    }\n}"
+                }
+            },
+            "enrichment": {
+                "dsl_string": "{\n  \"features\": [\n    {\n      \"name\": \"rsi\",\n      \"params\": {\n        \"on\": \"close\",\n        \"window\": 14\n      }\n    }\n  ]\n}",
+                "dsl": {
+                    "features": [
+                        {
+                            "name": "rsi",
+                            "params": {
+                                "on": "close",
+                                "window": 14
+                            }
+                        }
+                    ]
+                },
+                "errors": [],
+                "success": true
+            },
+            "final_shape": [
+                23,
+                9
+            ],
+            "status": "success",
+            "errors": [],
+            "cleaned_shape": [
+                23,
+                9
+            ],
+            "post_enrichment_cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 23,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "vwap",
+                        "timestamp",
+                        "transactions",
+                        "rsi_close_14"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [
+                            {
+                                "column": "rsi_close_14",
+                                "null_ratio": 0.6086956521739131,
+                                "null_count": 14
+                            }
+                        ],
+                        "columns_imputed": {},
+                        "total_columns_deleted": 1
+                    },
+                    "hard_rows_dropped": 0,
+                    "vwap_set_null": 0,
+                    "transactions_set_null": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "failed: SchemaErrors",
+                    "details": "{\n    \"SCHEMA\": {\n        \"WRONG_DATATYPE\": [\n            {\n                \"schema\": null,\n                \"column\": \"volume\",\n                \"check\": \"dtype('int64')\",\n                \"error\": \"expected series 'volume' to have type int64, got float64\"\n            }\n        ]\n    }\n}"
+                }
+            },
+            "post_cleaned_shape": [
+                23,
+                9
+            ]
+        }
+    ],
+    "overall_status": "success",
+    "total_errors": 0
+}

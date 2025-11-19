@@ -30,6 +30,7 @@ class PipelineStatusResponse(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime] = None
     error: Optional[str] = None
+    stage_flags: Dict[str, bool] = Field(default_factory=dict)
 
 class DataFrameInfo(BaseModel):
     index: int
@@ -59,4 +60,5 @@ class WebSocketMessage(BaseModel):
     progress: Optional[int] = None
     message: str
     timestamp: datetime
+    stage_flags: Optional[Dict[str, bool]] = None
     data: Optional[Dict[str, Any]] = None

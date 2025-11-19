@@ -6,6 +6,7 @@ export interface WebSocketMessage {
   progress?: number;
   message: string;
   timestamp: string;
+  stage_flags?: Record<string, boolean>;
   data?: any;
 }
 

@@ -1,0 +1,277 @@
+{
+    "dataframes_processed": 2,
+    "results": [
+        {
+            "index": 0,
+            "original_shape": [
+                800,
+                10
+            ],
+            "keywords": [
+                "SMA_10"
+            ],
+            "cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 800,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "vwap",
+                        "timestamp",
+                        "transactions",
+                        "otc"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 200,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [
+                            {
+                                "column": "otc",
+                                "null_ratio": 1.0,
+                                "null_count": 600
+                            }
+                        ],
+                        "columns_imputed": {},
+                        "total_columns_deleted": 1
+                    },
+                    "hard_rows_dropped": 0,
+                    "vwap_set_null": 1,
+                    "transactions_set_null": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "failed: SchemaErrors",
+                    "details": "{\n    \"SCHEMA\": {\n        \"WRONG_DATATYPE\": [\n            {\n                \"schema\": null,\n                \"column\": \"volume\",\n                \"check\": \"dtype('int64')\",\n                \"error\": \"expected series 'volume' to have type int64, got float64\"\n            }\n        ]\n    }\n}"
+                }
+            },
+            "enrichment": {
+                "dsl_string": "{\n  \"features\": [\n    {\n      \"name\": \"sma\",\n      \"params\": {\n        \"on\": \"close\",\n        \"window\": 10\n      }\n    }\n  ]\n}",
+                "dsl": {
+                    "features": [
+                        {
+                            "name": "sma",
+                            "params": {
+                                "on": "close",
+                                "window": 10
+                            }
+                        }
+                    ]
+                },
+                "errors": [],
+                "success": true
+            },
+            "final_shape": [
+                600,
+                10
+            ],
+            "status": "success",
+            "errors": [],
+            "cleaned_shape": [
+                600,
+                9
+            ],
+            "post_enrichment_cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 600,
+                    "columns": [
+                        "ticker",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "vwap",
+                        "timestamp",
+                        "transactions",
+                        "sma_close_10"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [],
+                        "columns_imputed": {
+                            "vwap": {
+                                "null_count": 1,
+                                "null_ratio": 0.0016666666666666668,
+                                "method": "normal_distribution",
+                                "mean": 209.01202621035057,
+                                "std": 26.93144686244465
+                            },
+                            "sma_close_10": {
+                                "null_count": 9,
+                                "null_ratio": 0.015,
+                                "method": "normal_distribution",
+                                "mean": 209.12743057529613,
+                                "std": 11.330598541659585
+                            }
+                        }
+                    },
+                    "hard_rows_dropped": 0,
+                    "vwap_set_null": 1,
+                    "transactions_set_null": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "failed: SchemaErrors",
+                    "details": "{\n    \"SCHEMA\": {\n        \"WRONG_DATATYPE\": [\n            {\n                \"schema\": null,\n                \"column\": \"volume\",\n                \"check\": \"dtype('int64')\",\n                \"error\": \"expected series 'volume' to have type int64, got float64\"\n            }\n        ]\n    }\n}"
+                }
+            },
+            "post_cleaned_shape": [
+                600,
+                10
+            ]
+        },
+        {
+            "index": 1,
+            "original_shape": [
+                800,
+                10
+            ],
+            "keywords": [
+                "SMA_10"
+            ],
+            "cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 800,
+                    "columns": [
+                        "vwap",
+                        "transactions",
+                        "otc",
+                        "ticker",
+                        "timestamp",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [
+                            {
+                                "column": "otc",
+                                "null_ratio": 1.0,
+                                "null_count": 800
+                            }
+                        ],
+                        "columns_imputed": {},
+                        "total_columns_deleted": 1
+                    },
+                    "hard_rows_dropped": 0,
+                    "vwap_set_null": 85,
+                    "transactions_set_null": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "passed"
+                }
+            },
+            "enrichment": {
+                "dsl_string": "{\n  \"features\": [\n    {\n      \"name\": \"sma\",\n      \"params\": {\n        \"on\": \"close\",\n        \"window\": 10\n      }\n    }\n  ]\n}",
+                "dsl": {
+                    "features": [
+                        {
+                            "name": "sma",
+                            "params": {
+                                "on": "close",
+                                "window": 10
+                            }
+                        }
+                    ]
+                },
+                "errors": [],
+                "success": true
+            },
+            "final_shape": [
+                800,
+                10
+            ],
+            "status": "success",
+            "errors": [],
+            "cleaned_shape": [
+                800,
+                9
+            ],
+            "post_enrichment_cleaning": {
+                "read": {
+                    "path": null,
+                    "rows": 800,
+                    "columns": [
+                        "vwap",
+                        "transactions",
+                        "ticker",
+                        "timestamp",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "sma_close_10"
+                    ]
+                },
+                "clean": {
+                    "missing_required_columns": [
+                        "ts"
+                    ],
+                    "exact_duplicates_dropped": 0,
+                    "null_handling": {
+                        "threshold": 0.5,
+                        "columns_deleted": [],
+                        "columns_imputed": {
+                            "vwap": {
+                                "null_count": 85,
+                                "null_ratio": 0.10625,
+                                "method": "normal_distribution",
+                                "mean": 209.0435760839161,
+                                "std": 26.6272761022991
+                            },
+                            "sma_close_10": {
+                                "null_count": 9,
+                                "null_ratio": 0.01125,
+                                "method": "normal_distribution",
+                                "mean": 207.93952111251585,
+                                "std": 12.449129370001154
+                            }
+                        }
+                    },
+                    "hard_rows_dropped": 0,
+                    "vwap_set_null": 83,
+                    "transactions_set_null": 0
+                },
+                "pandera": {
+                    "enabled": true,
+                    "status": "passed"
+                }
+            },
+            "post_cleaned_shape": [
+                800,
+                10
+            ]
+        }
+    ],
+    "overall_status": "success",
+    "total_errors": 0
+}

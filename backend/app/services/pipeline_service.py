@@ -37,7 +37,13 @@ class PipelineService:
             "started_at": datetime.utcnow(),
             "completed_at": None,
             "error": None,
-            "run_dir": str(run_dir)
+            "run_dir": str(run_dir),
+            "stage_flags": {
+                "ingestion": False,
+                "validation": False,
+                "transformation": False,
+                "completed": False
+            }
         }
 
         return run_id
@@ -67,6 +73,25 @@ class PipelineService:
             if status in [PipelineStatus.COMPLETED, PipelineStatus.FAILED]:
                 self.runs[run_id]["completed_at"] = datetime.utcnow()
 
+    def set_stage_flag(self, run_id: str, stage: str, value: bool = True):
+        """Mark a stage as completed (or reset it)"""
+        if run_id in self.runs and stage in self.runs[run_id]["stage_flags"]:
+            self.runs[run_id]["stage_flags"][stage] = value
+
+    async def _run_blocking(self, func, *args, **kwargs):
+        """Run a blocking function in a thread to avoid blocking the event loop"""
+        return await asyncio.to_thread(func, *args, **kwargs)
+
+    def _write_text_file(self, path: Path, content: str):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            f.write(content)
+
+    def _write_json_file(self, path: Path, data: Any):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(data, f, indent=4)
+
     async def run_pipeline(self, run_id: str, query: str, websocket_callback=None):
         """Execute the ETL pipeline"""
         run_dir = Path(self.runs[run_id]["run_dir"])
@@ -74,6 +99,7 @@ class PipelineService:
         try:
             # Stage 1: Ingestion
             await self._send_update(
+                run_id,
                 websocket_callback,
                 "progress",
                 PipelineStatus.INGESTION,
@@ -89,13 +115,21 @@ class PipelineService:
             )
 
             ingestor = Ingestor()
-            dataframes, enrichment_features, key_features, validation_reports = ingestor.process(query)
+            dataframes, enrichment_features, key_features, validation_reports = await self._run_blocking(
+                ingestor.process,
+                query
+            )
 
-            # Save enrichment features
-            with open(run_dir / "enrichment_features.txt", "w") as f:
-                f.write(",".join(enrichment_features))
+            await self._run_blocking(
+                self._write_text_file,
+                run_dir / "enrichment_features.txt",
+                ",".join(enrichment_features)
+            )
+
+            self.set_stage_flag(run_id, "ingestion")
 
             await self._send_update(
+                run_id,
                 websocket_callback,
                 "progress",
                 PipelineStatus.INGESTION,
@@ -105,6 +139,7 @@ class PipelineService:
 
             # Stage 2: Validation
             await self._send_update(
+                run_id,
                 websocket_callback,
                 "progress",
                 PipelineStatus.VALIDATION,
@@ -120,16 +155,28 @@ class PipelineService:
             )
 
             validator = Validator()
-            val_out, validation_report = validator.process(dataframes)
+            val_out, validation_report = await self._run_blocking(
+                validator.process,
+                dataframes
+            )
 
-            # Save validation outputs
-            validator.save_outputs(val_out, output_dir=str(run_dir / "val_outputs"), prefix="result")
+            await self._run_blocking(
+                validator.save_outputs,
+                val_out,
+                str(run_dir / "val_outputs"),
+                "result"
+            )
 
-            # Save validation report
-            with open(run_dir / "validation_report.json", "w") as f:
-                json.dump(validation_report, f, indent=4)
+            await self._run_blocking(
+                self._write_json_file,
+                run_dir / "validation_report.json",
+                validation_report
+            )
+
+            self.set_stage_flag(run_id, "validation")
 
             await self._send_update(
+                run_id,
                 websocket_callback,
                 "progress",
                 PipelineStatus.VALIDATION,
@@ -139,6 +186,7 @@ class PipelineService:
 
             # Stage 3: Transformation
             await self._send_update(
+                run_id,
                 websocket_callback,
                 "progress",
                 PipelineStatus.TRANSFORMATION,
@@ -153,17 +201,25 @@ class PipelineService:
                 "transformation"
             )
 
-            trans_out, transformation_report = transform_pipeline(val_out, enrichment_features)
+            trans_out, transformation_report = await self._run_blocking(
+                transform_pipeline,
+                val_out,
+                enrichment_features
+            )
 
-            # Save transformation outputs
             for i, df in enumerate(trans_out):
-                df.to_csv(run_dir / f"df_{i}.csv", index=False)
+                await self._run_blocking(df.to_csv, run_dir / f"df_{i}.csv", index=False)
 
-            # Save transformation report
-            with open(run_dir / "transformation_report.json", "w") as f:
-                json.dump(transformation_report, f, indent=4)
+            await self._run_blocking(
+                self._write_json_file,
+                run_dir / "transformation_report.json",
+                transformation_report
+            )
+
+            self.set_stage_flag(run_id, "transformation")
 
             await self._send_update(
+                run_id,
                 websocket_callback,
                 "progress",
                 PipelineStatus.TRANSFORMATION,
@@ -180,7 +236,9 @@ class PipelineService:
                 "completed"
             )
 
+            self.set_stage_flag(run_id, "completed")
             await self._send_update(
+                run_id,
                 websocket_callback,
                 "complete",
                 PipelineStatus.COMPLETED,
@@ -201,6 +259,7 @@ class PipelineService:
             )
 
             await self._send_update(
+                run_id,
                 websocket_callback,
                 "error",
                 PipelineStatus.FAILED,
@@ -211,6 +270,7 @@ class PipelineService:
 
     async def _send_update(
         self,
+        run_id: str,
         websocket_callback,
         msg_type: str,
         stage: PipelineStatus,
@@ -220,13 +280,19 @@ class PipelineService:
     ):
         """Send update via WebSocket if callback is provided"""
         if websocket_callback:
+            payload = dict(data) if data else {}
+            if run_id in self.runs:
+                payload.setdefault("stage_flags", self.runs[run_id]["stage_flags"].copy())
+            payload.setdefault("run_id", run_id)
+            stage_flags = payload.get("stage_flags")
             await websocket_callback({
                 "type": msg_type,
                 "stage": stage.value,
                 "progress": progress,
                 "message": message,
                 "timestamp": datetime.utcnow().isoformat(),
-                "data": data
+                "stage_flags": stage_flags,
+                "data": payload
             })
 
     def get_results(self, run_id: str) -> Optional[Dict[str, Any]]:

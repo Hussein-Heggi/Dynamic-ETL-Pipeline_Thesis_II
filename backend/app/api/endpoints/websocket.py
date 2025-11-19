@@ -71,7 +71,9 @@ async def websocket_endpoint(websocket: WebSocket, run_id: str):
                         "type": "status",
                         "status": current_status["status"],
                         "progress": current_status["progress"],
-                        "message": current_status["message"]
+                        "message": current_status["message"],
+                        "stage": current_status["current_stage"],
+                        "stage_flags": current_status.get("stage_flags", {})
                     })
             except WebSocketDisconnect:
                 break

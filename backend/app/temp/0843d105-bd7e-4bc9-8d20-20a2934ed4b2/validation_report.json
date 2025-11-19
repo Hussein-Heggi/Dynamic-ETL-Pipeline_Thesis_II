@@ -1,0 +1,150 @@
+{
+    "input_count": 10,
+    "input_shapes": [
+        [
+            251,
+            10
+        ],
+        [
+            251,
+            10
+        ],
+        [
+            251,
+            10
+        ],
+        [
+            251,
+            10
+        ],
+        [
+            251,
+            10
+        ],
+        [
+            3873,
+            7
+        ],
+        [
+            6553,
+            7
+        ],
+        [
+            6553,
+            7
+        ],
+        [
+            5348,
+            7
+        ],
+        [
+            1642,
+            7
+        ]
+    ],
+    "union_operations": [
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 1.0,
+            "result_shape": [
+                502,
+                10
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 1.0,
+            "result_shape": [
+                753,
+                10
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 1.0,
+            "result_shape": [
+                1004,
+                10
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group0",
+            "score": 1.0,
+            "result_shape": [
+                1255,
+                10
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group1",
+            "score": 1.0,
+            "result_shape": [
+                10426,
+                7
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group1",
+            "score": 1.0,
+            "result_shape": [
+                16979,
+                7
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group1",
+            "score": 1.0,
+            "result_shape": [
+                22327,
+                7
+            ]
+        },
+        {
+            "operation": "union",
+            "group": "Group1",
+            "score": 1.0,
+            "result_shape": [
+                23969,
+                7
+            ]
+        }
+    ],
+    "join_operations": {
+        "stage_1": [
+            {
+                "dataframes": [
+                    0,
+                    1
+                ],
+                "compatible": true,
+                "retention": 2.069322709163347,
+                "matched_rows": 2597,
+                "result_shape": [
+                    2597,
+                    17
+                ]
+            }
+        ],
+        "stage_2": []
+    },
+    "early_termination": false,
+    "stage_2_skipped": false,
+    "output_count": 2,
+    "output_shapes": [
+        [
+            2597,
+            10
+        ],
+        [
+            2597,
+            10
+        ]
+    ]
+}

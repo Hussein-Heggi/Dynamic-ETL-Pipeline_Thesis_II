@@ -12,6 +12,13 @@ export interface PipelineRunResponse {
   created_at: string;
 }
 
+export interface StageFlags {
+  ingestion: boolean;
+  validation: boolean;
+  transformation: boolean;
+  completed: boolean;
+}
+
 export interface PipelineStatusResponse {
   run_id: string;
   status: string;
@@ -21,6 +28,7 @@ export interface PipelineStatusResponse {
   started_at: string;
   completed_at?: string;
   error?: string;
+  stage_flags: StageFlags;
 }
 
 export interface DataFrameInfo {

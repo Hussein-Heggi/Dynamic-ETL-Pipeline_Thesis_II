@@ -9,8 +9,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import pipelineApi from '@/lib/api/pipeline';
+import pipelineApi, { StageFlags } from '@/lib/api/pipeline';
 import { PipelineWebSocket, WebSocketMessage } from '@/lib/websocket';
+
+const EMPTY_STAGE_FLAGS: StageFlags = {
+  ingestion: false,
+  validation: false,
+  transformation: false,
+  completed: false,
+};
+
+const normalizeStageFlags = (flags?: Partial<StageFlags>): StageFlags => ({
+  ...EMPTY_STAGE_FLAGS,
+  ...flags,
+});
+
+type StageKey = keyof StageFlags;
+const STAGE_SEQUENCE: StageKey[] = ['ingestion', 'validation', 'transformation', 'completed'];
 
 export default function ResultsPage() {
   const params = useParams();
@@ -19,26 +34,35 @@ export default function ResultsPage() {
   const [wsMessages, setWsMessages] = useState<WebSocketMessage[]>([]);
   const [currentProgress, setCurrentProgress] = useState(0);
   const [currentStage, setCurrentStage] = useState('pending');
+  const [stageFlags, setStageFlags] = useState<StageFlags>({ ...EMPTY_STAGE_FLAGS });
   const [wsConnected, setWsConnected] = useState(false);
 
-  // Fetch status
   const { data: status } = useQuery({
     queryKey: ['pipeline-status', runId],
     queryFn: () => pipelineApi.getStatus(runId),
     refetchInterval: (data) => {
-      // Stop polling if completed or failed
-      return data?.status === 'completed' || data?.status === 'failed' ? false : 2000;
+      return data?.status === 'completed' || data?.status === 'failed' ? false : 1000;
     },
   });
 
-  // Fetch results only when completed
   const { data: results } = useQuery({
     queryKey: ['pipeline-results', runId],
     queryFn: () => pipelineApi.getResults(runId),
     enabled: status?.status === 'completed',
   });
 
-  // WebSocket connection
+useEffect(() => {
+  setStageFlags({ ...EMPTY_STAGE_FLAGS });
+}, [runId]);
+
+useEffect(() => {
+  if (status) {
+    setCurrentProgress(status.progress);
+    setCurrentStage(status.status);
+    setStageFlags(normalizeStageFlags(status.stage_flags));
+  }
+}, [status]);
+
   useEffect(() => {
     let ws: PipelineWebSocket | null = null;
 
@@ -52,6 +76,10 @@ export default function ResultsPage() {
           }
           if (message.stage) {
             setCurrentStage(message.stage);
+          }
+          const flagUpdate = message.stage_flags || message.data?.stage_flags;
+          if (flagUpdate) {
+            setStageFlags(normalizeStageFlags(flagUpdate));
           }
         },
         (error) => console.error('WebSocket error:', error),
@@ -69,32 +97,53 @@ export default function ResultsPage() {
     };
   }, [runId, status?.status]);
 
-  const getStageStatus = (stage: string) => {
-    const stages = ['pending', 'ingestion', 'validation', 'transformation', 'completed'];
-    const currentIndex = stages.indexOf(currentStage);
-    const stageIndex = stages.indexOf(stage);
+  const getStageStatus = (stage: StageKey) => {
+    if (stageFlags[stage]) {
+      return 'completed';
+    }
+
+    const firstIncompleteIndex = STAGE_SEQUENCE.findIndex((name) => !stageFlags[name]);
+    const stageIndex = STAGE_SEQUENCE.indexOf(stage);
 
     if (status?.status === 'failed') {
-      if (stageIndex <= currentIndex) return 'failed';
+      if (firstIncompleteIndex === -1) {
+        return 'completed';
+      }
+      if (stageIndex === firstIncompleteIndex) {
+        return 'failed';
+      }
+      if (stageIndex < firstIncompleteIndex) {
+        return 'completed';
+      }
       return 'pending';
     }
 
-    if (stageIndex < currentIndex) return 'completed';
-    if (stageIndex === currentIndex) return 'active';
+    if (firstIncompleteIndex === -1) {
+      return 'completed';
+    }
+
+    if (stageIndex === firstIncompleteIndex && status?.status !== 'pending') {
+      return 'active';
+    }
+
+    if (stageIndex < firstIncompleteIndex) {
+      return 'completed';
+    }
+
     return 'pending';
   };
 
-  const StageIndicator = ({ stage, label }: { stage: string; label: string }) => {
+  const StageIndicator = ({ stage, label }: { stage: StageKey; label: string }) => {
     const stageStatus = getStageStatus(stage);
 
     return (
       <div className="flex flex-col items-center space-y-2">
         <div
-          className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
             stageStatus === 'completed'
-              ? 'bg-green-600'
+              ? 'bg-green-600 scale-100'
               : stageStatus === 'active'
-              ? 'bg-blue-600 animate-pulse'
+              ? 'bg-blue-600 scale-110'
               : stageStatus === 'failed'
               ? 'bg-red-600'
               : 'bg-gray-300'
@@ -111,8 +160,10 @@ export default function ResultsPage() {
           )}
         </div>
         <span
-          className={`text-sm font-medium ${
-            stageStatus === 'active' ? 'text-blue-600' : 'text-gray-600'
+          className={`text-sm font-medium transition-colors ${
+            stageStatus === 'active' ? 'text-blue-600 font-bold' :
+            stageStatus === 'completed' ? 'text-green-600' :
+            'text-gray-600'
           }`}
         >
           {label}
@@ -123,11 +174,10 @@ export default function ResultsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">Pipeline Execution</h1>
-          {status && (
+          {status && status.status !== 'pending' && status.status !== 'ingestion' && status.status !== 'validation' && status.status !== 'transformation' && (
             <Badge
               variant={
                 status.status === 'completed'
@@ -136,6 +186,7 @@ export default function ResultsPage() {
                   ? 'destructive'
                   : 'secondary'
               }
+              className="text-base px-4 py-1"
             >
               {status.status}
             </Badge>
@@ -144,7 +195,6 @@ export default function ResultsPage() {
         <p className="text-gray-600">Run ID: {runId}</p>
       </div>
 
-      {/* Progress Pipeline */}
       <Card>
         <CardHeader>
           <CardTitle>Pipeline Progress</CardTitle>
@@ -152,25 +202,34 @@ export default function ResultsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {/* Stage Indicators */}
             <div className="flex items-center justify-between relative">
-              <div className="absolute top-6 left-0 right-0 h-0.5 bg-gray-300 -z-10" />
+              <div className="absolute top-6 left-0 right-0 h-1 bg-gray-200 -z-10">
+                <div
+                  className="h-full bg-blue-600 transition-all duration-500"
+                  style={{
+                    width: `${Math.min(currentProgress, 100)}%`,
+                  }}
+                />
+              </div>
+
               <StageIndicator stage="ingestion" label="Ingestion" />
               <StageIndicator stage="validation" label="Validation" />
               <StageIndicator stage="transformation" label="Transformation" />
               <StageIndicator stage="completed" label="Completed" />
             </div>
 
-            {/* Progress Bar */}
             <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{status?.message || 'Initializing...'}</span>
-                <span className="font-medium">{currentProgress}%</span>
+              <div className="flex justify-between items-center text-sm">
+                <div className="flex items-center space-x-2">
+                  <span className="text-gray-600 font-medium">
+                    {status?.message || 'Initializing...'}
+                  </span>
+                </div>
+                <span className="font-bold text-lg">{Math.round(currentProgress)}%</span>
               </div>
-              <Progress value={currentProgress} className="h-2" />
+              <Progress value={currentProgress} className="h-3" />
             </div>
 
-            {/* Error Message */}
             {status?.error && (
               <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm font-medium text-red-800">Error:</p>
@@ -181,18 +240,20 @@ export default function ResultsPage() {
         </CardContent>
       </Card>
 
-      {/* Live Logs */}
       {wsConnected && wsMessages.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Live Logs</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <span>Live Logs</span>
+              <Badge variant="outline" className="animate-pulse">Live</Badge>
+            </CardTitle>
             <CardDescription>Real-time updates from the pipeline</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-64 overflow-y-auto font-mono text-sm bg-gray-900 text-gray-100 p-4 rounded">
               {wsMessages.map((msg, idx) => (
                 <div key={idx} className="flex items-start space-x-2">
-                  <span className="text-gray-500">
+                  <span className="text-gray-500 flex-shrink-0">
                     [{new Date(msg.timestamp).toLocaleTimeString()}]
                   </span>
                   <span className={msg.type === 'error' ? 'text-red-400' : 'text-green-400'}>
@@ -205,7 +266,6 @@ export default function ResultsPage() {
         </Card>
       )}
 
-      {/* Results */}
       {results && (
         <Tabs defaultValue="data" className="w-full">
           <TabsList className="grid w-full grid-cols-4">

@@ -1,0 +1,45 @@
+{
+    "input_count": 2,
+    "input_shapes": [
+        [
+            66,
+            10
+        ],
+        [
+            3873,
+            7
+        ]
+    ],
+    "union_operations": [],
+    "join_operations": {
+        "stage_1": [
+            {
+                "dataframes": [
+                    0,
+                    1
+                ],
+                "compatible": true,
+                "retention": 0.696969696969697,
+                "matched_rows": 46,
+                "result_shape": [
+                    46,
+                    17
+                ]
+            }
+        ],
+        "stage_2": []
+    },
+    "early_termination": false,
+    "stage_2_skipped": false,
+    "output_count": 2,
+    "output_shapes": [
+        [
+            46,
+            10
+        ],
+        [
+            46,
+            10
+        ]
+    ]
+}

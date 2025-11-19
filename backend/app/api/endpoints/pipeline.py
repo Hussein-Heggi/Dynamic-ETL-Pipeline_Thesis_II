@@ -55,7 +55,8 @@ async def get_pipeline_status(run_id: str):
         message=run_info["message"],
         started_at=run_info["started_at"],
         completed_at=run_info["completed_at"],
-        error=run_info["error"]
+        error=run_info["error"],
+        stage_flags=run_info.get("stage_flags", {})
     )
 
 @router.get("/pipeline/results/{run_id}", response_model=PipelineResultsResponse)
