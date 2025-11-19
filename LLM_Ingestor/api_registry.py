@@ -478,7 +478,7 @@ def build_polygon_api() -> APISpec:
             ),
             
             # ================================================================
-            # ECONOMIC INDICATOR ENDPOINTS
+            # ECONOMIC INDICATOR ENDPOINTS (Polygon)
             # ================================================================
             
             # Treasury Yields
@@ -782,6 +782,14 @@ def build_alpha_vantage_api() -> APISpec:
                         valid_values=["quarterly", "annual"],
                         default_value="quarterly"
                     ),
+                    ParameterSchema(
+                        name="datatype",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
+                    ),
                 ],
                 parameter_mappings={
                     "interval": ParameterMapping(source="extracted_entities.frequency"),
@@ -796,17 +804,15 @@ def build_alpha_vantage_api() -> APISpec:
                 data_category="economic_indicator",
                 parameters=[
                     ParameterSchema(
-                        name="interval",
+                        name="datatype",
                         type=ParameterType.ENUM,
                         required=False,
-                        description="Data interval frequency",
-                        valid_values=["quarterly", "annual"],
-                        default_value="annual"
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
                     ),
                 ],
-                parameter_mappings={
-                    "interval": ParameterMapping(source="extracted_entities.frequency"),
-                },
+                parameter_mappings={},
                 alternative_endpoints=[]
             ),
             
@@ -832,6 +838,14 @@ def build_alpha_vantage_api() -> APISpec:
                         valid_values=["3month", "2year", "5year", "7year", "10year", "30year"],
                         default_value="10year"
                     ),
+                    ParameterSchema(
+                        name="datatype",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
+                    ),
                 ],
                 parameter_mappings={
                     "interval": ParameterMapping(source="extracted_entities.frequency"),
@@ -852,6 +866,14 @@ def build_alpha_vantage_api() -> APISpec:
                         description="Data interval frequency",
                         valid_values=["daily", "weekly", "monthly"],
                         default_value="monthly"
+                    ),
+                    ParameterSchema(
+                        name="datatype",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
                     ),
                 ],
                 parameter_mappings={
@@ -874,6 +896,14 @@ def build_alpha_vantage_api() -> APISpec:
                         valid_values=["monthly", "semiannual"],
                         default_value="monthly"
                     ),
+                    ParameterSchema(
+                        name="datatype",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
+                    ),
                 ],
                 parameter_mappings={
                     "interval": ParameterMapping(source="extracted_entities.frequency"),
@@ -888,17 +918,15 @@ def build_alpha_vantage_api() -> APISpec:
                 data_category="economic_indicator",
                 parameters=[
                     ParameterSchema(
-                        name="interval",
+                        name="datatype",
                         type=ParameterType.ENUM,
                         required=False,
-                        description="Data interval frequency",
-                        valid_values=["monthly", "annual"],
-                        default_value="annual"
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
                     ),
                 ],
-                parameter_mappings={
-                    "interval": ParameterMapping(source="extracted_entities.frequency"),
-                },
+                parameter_mappings={},
                 alternative_endpoints=[]
             ),
             
@@ -907,7 +935,16 @@ def build_alpha_vantage_api() -> APISpec:
                 name="RETAIL_SALES",
                 description="Monthly retail sales data measuring consumer spending patterns for economic health evaluation",
                 data_category="economic_indicator",
-                parameters=[],
+                parameters=[
+                    ParameterSchema(
+                        name="datatype",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
+                    ),
+                ],
                 parameter_mappings={},
                 alternative_endpoints=[]
             ),
@@ -917,7 +954,16 @@ def build_alpha_vantage_api() -> APISpec:
                 name="DURABLES",
                 description="Durable goods orders indicating business investment and manufacturing activity for economic forecasting",
                 data_category="economic_indicator",
-                parameters=[],
+                parameters=[
+                    ParameterSchema(
+                        name="datatype",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
+                    ),
+                ],
                 parameter_mappings={},
                 alternative_endpoints=[]
             ),
@@ -927,7 +973,16 @@ def build_alpha_vantage_api() -> APISpec:
                 name="UNEMPLOYMENT",
                 description="Unemployment rate data showing labor market health and economic conditions for policy analysis",
                 data_category="economic_indicator",
-                parameters=[],
+                parameters=[
+                    ParameterSchema(
+                        name="datatype",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
+                    ),
+                ],
                 parameter_mappings={},
                 alternative_endpoints=[]
             ),
@@ -937,7 +992,16 @@ def build_alpha_vantage_api() -> APISpec:
                 name="NONFARM_PAYROLL",
                 description="Monthly nonfarm payroll employment data measuring job creation and economic growth momentum",
                 data_category="economic_indicator",
-                parameters=[],
+                parameters=[
+                    ParameterSchema(
+                        name="datatype",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
+                    ),
+                ],
                 parameter_mappings={},
                 alternative_endpoints=[]
             ),

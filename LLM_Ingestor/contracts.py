@@ -1,24 +1,17 @@
 """
-Data Contracts - Updated for LLM-driven architecture with validation reports
-UPDATED: Added semantic_keywords to LLMResponse for query intent modeling
+Data Contracts - With proceed flag and semantic_keywords
 """
 from pydantic import BaseModel, Field
 from typing import Dict, List, Any, Optional, Literal
 import pandas as pd
 
 
-# ============================================================================
-# CONTRACT A: QueryAnalyzer Output (UPDATED)
-# ============================================================================
-
 class FeatureSpec(BaseModel):
-    """Features extracted from query"""
-    native: List[str] = Field(default_factory=list, description="API-provided features")
-    enrichment: List[str] = Field(default_factory=list, description="Calculated features")
+    native: List[str] = Field(default_factory=list)
+    enrichment: List[str] = Field(default_factory=list)
 
 
 class LLMAPIRequest(BaseModel):
-    """API request proposed by LLM"""
     api_name: str
     endpoint_name: str
     parameters: Dict[str, Any]
@@ -26,59 +19,39 @@ class LLMAPIRequest(BaseModel):
 
 
 class LLMResponse(BaseModel):
-    """Complete LLM output from QueryAnalyzer"""
+    proceed: bool = Field(default=True)
     features: FeatureSpec
-    semantic_keywords: List[str] = Field(default_factory=list, description="Intent keywords from query")
+    semantic_keywords: List[str] = Field(default_factory=list)
     api_requests: List[LLMAPIRequest]
     tickers: List[str] = Field(default_factory=list)
 
 
-# ============================================================================
-# CONTRACT B: Validated API Request (UPDATED)
-# ============================================================================
-
 class APIRequest(BaseModel):
-    """A single API request with validation metadata"""
     api_name: str
     endpoint_name: str
     parameters: Dict[str, Any]
-    
-    # Validation fields
-    semantic_score: Optional[float] = Field(None, description="FAISS similarity score (0-1)")
+    semantic_score: Optional[float] = None
     validation_status: Literal["PENDING", "VALID", "WARNING", "ERROR"] = "PENDING"
     validation_errors: List[str] = Field(default_factory=list)
     validation_warnings: List[str] = Field(default_factory=list)
 
 
 class ExecutionPlan(BaseModel):
-    """Plan for executing API requests"""
     ranked_requests: List[APIRequest]
 
 
-# ============================================================================
-# CONTRACT C: Output Validation (NEW)
-# ============================================================================
-
 class ValidationReport(BaseModel):
-    """Post-fetch validation report for a dataset"""
     api_name: str
     endpoint_name: str
     ticker: Optional[str] = None
-    
     found_features: List[str] = Field(default_factory=list)
     fuzzy_matched_features: List[Dict[str, Any]] = Field(default_factory=list)
     missing_features: List[str] = Field(default_factory=list)
-    
     actual_columns: List[str] = Field(default_factory=list)
     validation_passed: bool = True
 
 
-# ============================================================================
-# CONTRACT D: Execution Results (UPDATED)
-# ============================================================================
-
 class APIResult(BaseModel):
-    """Result from a single API call"""
     api_name: str
     endpoint_name: str
     status: Literal["SUCCESS", "FAILED"]
@@ -93,7 +66,6 @@ class APIResult(BaseModel):
 
 
 class ExecutionResults(BaseModel):
-    """Complete results from pipeline execution"""
     results: List[APIResult]
     failed_requests: List[APIRequest] = Field(default_factory=list)
     overall_status: Literal["COMPLETE", "PARTIAL", "FAILED"]

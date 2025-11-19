@@ -1,133 +1,170 @@
-import requests
+"""
+Alpha Vantage Client - Fixed for economic indicators (no ticker required)
+"""
+from datetime import datetime, timedelta, date
+from typing import Dict, Any, List, Tuple, Optional
+
 import pandas as pd
-from typing import Dict, Any, List, Tuple
-from .base_api_client import BaseAPIClient
+import requests
+
+from base_api_client import BaseAPIClient
 
 class AlphaVantageClient(BaseAPIClient):
-    """
-    API Client for fetching stock data from Alpha Vantage.
-    Inherits from BaseAPIClient and implements methods for fetching,
-    parsing, and computing statistics for stock price data.
-    """
+    """API Client for Alpha Vantage - supports both stock and economic data"""
+    
     def __init__(self, api_key: str):
-        """
-        Initializes the AlphaVantageClient.
-
-        Args:
-            api_key (str): The API key for accessing Alpha Vantage services.
-        """
         if not api_key:
             raise ValueError("API key is required for AlphaVantageClient")
         self.api_key = api_key
         self.base_url = 'https://www.alphavantage.co/query'
-        # Define standard OHLCV columns expected/handled by this client
         self._standard_columns = ['open', 'high', 'low', 'close', 'volume']
-
-    def fetch_data(self, features: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Fetch stock price data from Alpha Vantage based on provided features.
-
-        Args:
-            features (Dict[str, Any]): A dictionary containing parameters for the API call.
-                Expected keys:
-                'ticker' or 'symbol' (str): The stock symbol (e.g., 'IBM').
-                'timespan' or 'interval' (str): The time interval ('1min', '5min', '15min', '30min', '60min', 'day', 'week', 'month').
-                'outputsize' (str, optional): 'compact' or 'full'. Defaults vary by timespan.
-                'month' (str, optional): Specific month for intraday data (YYYY-MM).
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the raw JSON response data under the key 'data'
-                            and the features dictionary used for the request under 'features'.
-
-        Raises:
-            ValueError: If the timespan is unsupported or if the API returns an error message.
-            requests.exceptions.RequestException: If the HTTP request fails.
-        """
-        # Accept both 'ticker' and 'symbol' for flexibility
-        ticker = features.get('ticker') or features.get('symbol')
-        if not ticker:
-            raise ValueError("Missing required parameter: 'ticker' or 'symbol'")
+        self.default_window_days = 30
+        self.frequency_window_map = {
+            'intraday': 100,
+            '1min': 100,
+            '5min': 100,
+            '15min': 100,
+            '30min': 100,
+            '60min': 100,
+            'daily': 30,
+            'day': 30,
+            'weekly': 26,
+            'week': 26,
+            'monthly': 12,
+            'month': 12,
+            'quarterly': 20,
+            'quarter': 20,
+            'annual': 10,
+            'year': 10
+        }
         
-        params = {
-            "symbol": ticker,
-            "apikey": self.api_key,
-            "datatype": "json" # Request JSON format
+        # Economic indicator endpoints that DON'T require ticker
+        self._economic_endpoints = {
+            'REAL_GDP', 'REAL_GDP_PER_CAPITA', 'TREASURY_YIELD', 'FEDERAL_FUNDS_RATE',
+            'CPI', 'INFLATION', 'RETAIL_SALES', 'DURABLES', 'UNEMPLOYMENT', 'NONFARM_PAYROLL'
         }
 
-        # Accept both 'timespan' and 'interval' for flexibility
-        timespan = features.get('timespan') or features.get('interval', 'day')
-        timespan = timespan.lower() # Normalize to lowercase
-
-        # Map user-friendly timespan to Alpha Vantage function names [1]
-        if timespan == 'day' or timespan == 'daily':
-            params['function'] = 'TIME_SERIES_DAILY'
-            params['outputsize'] = features.get('outputsize', 'full') # Default to full history
-        elif timespan == 'week' or timespan == 'weekly':
-            params['function'] = 'TIME_SERIES_WEEKLY'
-            params['outputsize'] = features.get('outputsize', 'full') # Default to full history
-        elif timespan == 'month' or timespan == 'monthly':
-            params['function'] = 'TIME_SERIES_MONTHLY'
-            params['outputsize'] = features.get('outputsize', 'full') # Default to full history
-        elif timespan in ['1min', '5min', '15min', '30min', '60min']:
-            params['function'] = 'TIME_SERIES_INTRADAY'
-            params['interval'] = timespan
-            params['outputsize'] = features.get('outputsize', 'compact') # Default to recent 100 points
-            # Add month parameter if provided for intraday history [1]
-            if 'month' in features:
-                params['month'] = features['month']
-                params['outputsize'] = features.get('outputsize', 'full') # Need 'full' when specifying month
+    def fetch_data(self, features: Dict[str, Any]) -> Dict[str, Any]:
+        """Fetch data from Alpha Vantage"""
+        function_name = features.get('function', '')
+        
+        params = {
+            "apikey": self.api_key,
+            "datatype": "json"
+        }
+        
+        # Check if this is an economic indicator (no ticker needed)
+        is_economic = function_name in self._economic_endpoints
+        
+        if is_economic:
+            params['function'] = function_name
+            # Add optional parameters for economic endpoints
+            if 'interval' in features:
+                params['interval'] = features['interval']
+            if 'maturity' in features:
+                params['maturity'] = features['maturity']
         else:
-            raise ValueError(f"Unsupported timespan for Alpha Vantage: {timespan}")
+            # Stock endpoint - requires ticker
+            ticker = features.get('ticker') or features.get('symbol')
+            if not ticker:
+                raise ValueError("Missing required parameter: 'ticker' or 'symbol'")
+            
+            params['symbol'] = ticker
+            
+            if function_name:
+                params['function'] = function_name
+                
+                if function_name == 'TIME_SERIES_INTRADAY':
+                    interval = features.get('interval') or features.get('timespan', '5min')
+                    params['interval'] = interval
+                    params['outputsize'] = features.get('outputsize', 'compact')
+                    if 'month' in features:
+                        params['month'] = features['month']
+                        params['outputsize'] = features.get('outputsize', 'full')
+                elif function_name in ['TIME_SERIES_DAILY', 'TIME_SERIES_DAILY_ADJUSTED']:
+                    params['outputsize'] = features.get('outputsize', 'full')
+            else:
+                # Fallback to timespan-based logic
+                timespan = features.get('timespan') or features.get('interval', 'day')
+                timespan = timespan.lower()
+
+                if timespan in ['day', 'daily']:
+                    params['function'] = 'TIME_SERIES_DAILY'
+                    params['outputsize'] = features.get('outputsize', 'full')
+                elif timespan in ['week', 'weekly']:
+                    params['function'] = 'TIME_SERIES_WEEKLY'
+                elif timespan in ['month', 'monthly']:
+                    params['function'] = 'TIME_SERIES_MONTHLY'
+                elif timespan in ['1min', '5min', '15min', '30min', '60min']:
+                    params['function'] = 'TIME_SERIES_INTRADAY'
+                    params['interval'] = timespan
+                    params['outputsize'] = features.get('outputsize', 'compact')
+                else:
+                    raise ValueError(f"Unsupported timespan: {timespan}")
 
         try:
             response = requests.get(self.base_url, params=params)
-            response.raise_for_status() # Raises HTTPError for bad responses (4XX or 5XX)
+            response.raise_for_status()
             data = response.json()
 
-            # Check for API-specific errors returned in the JSON [1, 5]
             if not data:
-                 raise ValueError("Alpha Vantage API returned an empty response.")
+                raise ValueError("Alpha Vantage API returned an empty response.")
             if "Error Message" in data:
-                 raise ValueError(f"Alpha Vantage API Error: {data['Error Message']}")
-            # Check for rate limit notes [1]
+                raise ValueError(f"Alpha Vantage API Error: {data['Error Message']}")
             if "Note" in data and "API call frequency" in data["Note"]:
-                 print(f"Warning: Alpha Vantage rate limit may have been hit. Message: {data['Note']}")
-
+                print(f"Warning: Rate limit hit. Message: {data['Note']}")
 
             return {"data": data, "features": features}
 
         except requests.exceptions.RequestException as e:
             print(f"HTTP Request failed: {e}")
             raise
-        except ValueError as e: # Catch explicit errors raised above
-             print(f"Data fetch/validation error: {e}")
-             raise
-        except Exception as e: # Catch other potential errors (e.g., json decoding)
-             print(f"An unexpected error occurred during data fetching: {e}")
-             raise
 
-
-    def parse_response(self, response_package: Dict[str, Any]) -> Tuple[pd.DataFrame, List[str]]:
-        """
-        Parse the raw JSON response from Alpha Vantage into a standardized Pandas DataFrame.
-
-        Args:
-            response_package (Dict[str, Any]): The dictionary returned by fetch_data, containing
-                                               'data' (raw JSON) and 'features'.
-
-        Returns:
-            Tuple[pd.DataFrame, List[str]]: A tuple containing:
-                - A Pandas DataFrame with timestamp column (UTC), ticker column, and OHLCV columns.
-                - A list of strings representing the column names present in the returned DataFrame.
-
-        Raises:
-            ValueError: If the time series data cannot be found or parsed correctly.
-        """
+    def parse_response(self, response_package: Dict[str, Any]) -> pd.DataFrame:
+        """Parse Alpha Vantage response into DataFrame"""
         data = response_package["data"]
-        requested_features = response_package["features"]
-        columns_to_include = requested_features.get('columns', self._standard_columns) # User specified columns or default OHLCV
-
-        # Find the main time series data key (dynamic based on the function used) [5]
+        features = response_package["features"]
+        function_name = features.get('function', '')
+        
+        # Check if economic indicator
+        is_economic = function_name in self._economic_endpoints
+        
+        if is_economic:
+            return self._parse_economic_response(data, features)
+        else:
+            return self._parse_stock_response(data, features)
+    
+    def _parse_economic_response(self, data: Dict, features: Dict) -> pd.DataFrame:
+        """Parse economic indicator response"""
+        # Economic data comes in 'data' key
+        if 'data' not in data:
+            raise ValueError(f"Could not find 'data' key in economic response: {list(data.keys())}")
+        
+        records = data['data']
+        df = pd.DataFrame(records)
+        
+        if df.empty:
+            return df
+        
+        # Rename 'date' to 'timestamp' for consistency
+        if 'date' in df.columns:
+            df.rename(columns={'date': 'timestamp'}, inplace=True)
+            df['timestamp'] = pd.to_datetime(df['timestamp']).dt.date
+        
+        # Convert value to numeric
+        if 'value' in df.columns:
+            df['value'] = pd.to_numeric(df['value'], errors='coerce')
+        
+        # Sort by timestamp
+        if 'timestamp' in df.columns:
+            df = df.sort_values('timestamp')
+            df.reset_index(drop=True, inplace=True)
+        
+        return self._apply_requested_window(df, features)
+    
+    def _parse_stock_response(self, data: Dict, features: Dict) -> pd.DataFrame:
+        """Parse stock time series response"""
+        # Find time series key
         time_series_key = None
         for key in data.keys():
             if "Time Series" in key:
@@ -135,169 +172,143 @@ class AlphaVantageClient(BaseAPIClient):
                 break
 
         if not time_series_key:
-             # Handle cases where API call succeeded but returned no time series (e.g., bad ticker symbol results in empty dict sometimes)
-             if data.get("Meta Data"): # Check if metadata exists, implying a potentially valid but data-less response
-                 print(f"Warning: No time series data found for ticker '{requested_features.get('ticker', 'N/A')}' with features {requested_features}. Returning empty DataFrame.")
-                 return pd.DataFrame(), []
-             else:
-                 raise ValueError(f"Could not find time series data key in Alpha Vantage response: {list(data.keys())}")
+            if data.get("Meta Data"):
+                print(f"Warning: No time series data found. Returning empty DataFrame.")
+                return pd.DataFrame()
+            else:
+                raise ValueError(f"Could not find time series data key: {list(data.keys())}")
 
         time_series_data = data[time_series_key]
 
-        try:
-            # Convert the dictionary of time points into a DataFrame
-            df = pd.DataFrame.from_dict(time_series_data, orient='index')
+        # Convert to DataFrame
+        df = pd.DataFrame.from_dict(time_series_data, orient='index')
 
-            # Rename columns to remove Alpha Vantage prefixes (e.g., "1. open" -> "open") [5]
-            df.rename(columns=lambda x: x.split('. ')[1] if '. ' in x else x, inplace=True)
+        # Clean column names
+        def clean_column_name(col_name):
+            if '. ' in col_name:
+                cleaned = col_name.split('. ')[1]
+                return cleaned.replace(' ', '_').lower()
+            return col_name.lower()
+        
+        df.rename(columns=clean_column_name, inplace=True)
 
-            # Convert index to datetime and create timestamp column (UTC)
-            df.index = pd.to_datetime(df.index)
-            df = df.reset_index()
-            df.rename(columns={'index': 'timestamp'}, inplace=True)
-            
-            # Ensure timestamp is timezone-aware UTC
-            if df['timestamp'].dt.tz is None:
-                df['timestamp'] = df['timestamp'].dt.tz_localize('UTC')
-            
-            # Sort by timestamp
-            df.sort_values('timestamp', inplace=True)
-            df.reset_index(drop=True, inplace=True)
+        # Convert index to timestamp column (date only)
+        df.index = pd.to_datetime(df.index)
+        df = df.reset_index()
+        df.rename(columns={'index': 'timestamp'}, inplace=True)
+        df['timestamp'] = df['timestamp'].dt.date
+        
+        # Sort by timestamp
+        df = df.sort_values('timestamp')
+        df.reset_index(drop=True, inplace=True)
 
-            # Select only the standard columns that are actually present after renaming
-            available_standard_cols = [col for col in self._standard_columns if col in df.columns]
-
-            # Convert OHLCV columns to numeric types, coercing errors to NaN
-            for col in available_standard_cols:
+        # Convert numeric columns
+        numeric_cols = ['open', 'high', 'low', 'close', 'volume', 
+                       'adjusted_close', 'dividend_amount', 'split_coefficient']
+        for col in numeric_cols:
+            if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
 
-            # Filter to only the columns requested by the user (if specified) that are available
-            final_columns = ['timestamp'] + [col for col in columns_to_include if col in df.columns]
-            df = df[final_columns] # Keep only timestamp + requested & available columns
+        # Add ticker column
+        ticker = features.get('ticker') or features.get('symbol')
+        if ticker:
+            df.insert(0, 'ticker', ticker)
 
-            # Add ticker column at the beginning
-            ticker = requested_features.get('ticker') or requested_features.get('symbol')
-            if ticker:
-                df.insert(0, 'ticker', ticker)
-
-            return df, list(df.columns)
-
-        except Exception as e:
-            print(f"Error parsing Alpha Vantage response: {e}")
-            raise ValueError(f"Failed to parse time series data. Error: {e}")
-
-
-    # def compute_statistics(self, df: pd.DataFrame) -> Dict[str, Any]:
-    #     """
-    #     Compute descriptive statistics on the parsed DataFrame.
-
-    #     Args:
-    #         df (pd.DataFrame): The DataFrame returned by parse_response.
-
-    #     Returns:
-    #         Dict[str, Any]: A dictionary containing computed statistics:
-    #             - 'descriptive_stats': Basic statistics (mean, std, min, max, etc.).
-    #             - 'missing_values': Count of NaN values per column.
-    #             - 'skewness': Skewness of numeric columns.
-    #             - 'kurtosis': Kurtosis of numeric columns.
-    #             - 'shape': Tuple representing (rows, columns) of the DataFrame.
-    #             - 'column_types': Data types of each column.
-    #     """
-    #     stats = {}
-    #     numeric_df = df.select_dtypes(include='number') # Operate only on numeric columns
-
-    #     if not numeric_df.empty:
-    #         stats["descriptive_stats"] = numeric_df.describe().to_dict()
-    #         stats["skewness"] = numeric_df.skew().to_dict()
-    #         stats["kurtosis"] = numeric_df.kurtosis().to_dict()
-    #     else:
-    #         stats["descriptive_stats"] = {}
-    #         stats["skewness"] = {}
-    #         stats["kurtosis"] = {}
-
-    #     stats["missing_values"] = df.isnull().sum().to_dict()
-    #     stats["shape"] = df.shape
-    #     stats["column_types"] = df.dtypes.astype(str).to_dict()
-
-    #     return stats
-
-# Example usage (ensure base_api_client.py is accessible)
-if __name__ == "__main__":
-    # NOTE: Replace 'demo' with your actual Alpha Vantage API key for extensive testing
-    # The 'demo' key is heavily rate-limited and may not work reliably. [1]
-    config = {'alpha_vantage_api_key': 'WXOG38FYIAUD05SZ'}
-
-    client = AlphaVantageClient(api_key=config.get('alpha_vantage_api_key'))
-
-    # --- Test Case 1: Daily Data (Default Columns) ---
-    print("\n--- Testing Daily (Default Columns) ---")
-    features_daily = {
-        'ticker': 'IBM',
-        'timespan': 'day',
-        'outputsize': 'compact' # Use compact for demo key to reduce data size
-    }
-    try:
-        raw_package_daily = client.fetch_data(features_daily)
-        # print("Fetched Daily Raw Keys:", raw_package_daily['data'].keys()) # Inspect raw response structure
-        df_daily, cols_daily = client.parse_response(raw_package_daily)
-        print(f"Parsed Daily DataFrame Head ({df_daily.shape}):\n", df_daily.head())
-        print("Daily Columns Returned:", cols_daily)
-        stats_daily = client.compute_statistics(df_daily)
-        print("Daily Stats (Shape):", stats_daily.get('shape'))
-        print("Daily Stats (Missing Values):", stats_daily.get('missing_values'))
-    except Exception as e:
-        print(f"Daily Test Failed: {e}")
-
-    # --- Test Case 2: Intraday Data (Specific Columns) ---
-    print("\n--- Testing Intraday 5min (Specific Columns) ---")
-    features_intraday = {
-        'ticker': 'IBM',
-        'timespan': '5min',
-        'outputsize': 'compact',
-        'columns': ['open', 'close', 'volume'] # Request specific columns
-    }
-    try:
-        raw_package_intraday = client.fetch_data(features_intraday)
-        df_intraday, cols_intraday = client.parse_response(raw_package_intraday)
-        print(f"Parsed Intraday DataFrame Head ({df_intraday.shape}):\n", df_intraday.head())
-        print("Intraday Columns Returned:", cols_intraday)
-        stats_intraday = client.compute_statistics(df_intraday)
-        print("Intraday Stats (Shape):", stats_intraday.get('shape'))
-        print("Intraday Stats (Missing Values):", stats_intraday.get('missing_values'))
-    except Exception as e:
-        print(f"Intraday Test Failed: {e}")
-
-    # --- Test Case 3: Monthly Data (History) ---
-    print("\n--- Testing Monthly (Full History - may fail with demo key) ---")
-    features_monthly = {
-        'ticker': 'TSCO.LON', # Example for a non-US ticker [1]
-        'timespan': 'month',
-        'outputsize': 'full'
-    }
-    try:
-        # This call might be large and could fail or be slow with a 'demo' key
-        raw_package_monthly = client.fetch_data(features_monthly)
-        df_monthly, cols_monthly = client.parse_response(raw_package_monthly)
-        print(f"Parsed Monthly DataFrame Head ({df_monthly.shape}):\n", df_monthly.head())
-        print("Monthly Columns Returned:", cols_monthly)
-        stats_monthly = client.compute_statistics(df_monthly)
-        print("Monthly Stats (Shape):", stats_monthly.get('shape'))
-    except Exception as e:
-        print(f"Monthly Test Failed: {e}")
-
-    # --- Test Case 4: Invalid Ticker ---
-    print("\n--- Testing Invalid Ticker ---")
-    features_invalid = {
-        'ticker': 'INVALIDTICKERXYZ',
-        'timespan': 'day',
-        'outputsize': 'compact'
-    }
-    try:
-        raw_package_invalid = client.fetch_data(features_invalid)
-        # Parsing might raise an error or return an empty DataFrame depending on API response
-        df_invalid, cols_invalid = client.parse_response(raw_package_invalid)
-        print(f"Parsed Invalid Ticker DataFrame ({df_invalid.shape}):\n", df_invalid.head())
-        stats_invalid = client.compute_statistics(df_invalid)
-        print("Invalid Ticker Stats (Shape):", stats_invalid.get('shape'))
-    except Exception as e:
-        print(f"Invalid Ticker Test completed (expected error or empty data): {e}")
+        return self._apply_requested_window(df, features)
+    
+    def _apply_requested_window(self, df: pd.DataFrame, features: Dict[str, Any]) -> pd.DataFrame:
+        """Trim Alpha Vantage datasets to the requested timeframe"""
+        if df.empty or 'timestamp' not in df.columns:
+            return df
+        
+        df = df.sort_values('timestamp')
+        timestamps = df['timestamp']
+        latest_timestamp = timestamps.max()
+        if isinstance(latest_timestamp, pd.Timestamp):
+            latest_timestamp = latest_timestamp.date()
+        if pd.isna(latest_timestamp):
+            return df
+        
+        start_value = features.get('from') or features.get('start_date')
+        end_value = features.get('to') or features.get('end_date')
+        explicit_window = any([start_value, end_value, features.get('date')])
+        
+        if not start_value and 'date' in features:
+            start_value = features['date']
+        if not end_value and 'date' in features:
+            end_value = features['date']
+        
+        start_date = self._parse_date(start_value)
+        end_date = self._parse_date(end_value)
+        
+        filtered = df.copy()
+        applied_window = False
+        
+        if start_date or end_date:
+            if end_date is None:
+                end_date = latest_timestamp
+            if start_date is None:
+                start_date = end_date - timedelta(days=self.default_window_days)
+            filtered = filtered[(filtered['timestamp'] >= start_date) & (filtered['timestamp'] <= end_date)]
+            applied_window = True
+        
+        if not applied_window and explicit_window and end_date:
+            filtered = filtered[filtered['timestamp'] <= end_date]
+            applied_window = True
+        
+        if not applied_window:
+            limit_value = self._safe_int(features.get('limit'))
+            if limit_value:
+                filtered = filtered.tail(limit_value)
+                applied_window = True
+        
+        if not applied_window:
+            frequency = self._extract_frequency(features)
+            if frequency in self.frequency_window_map:
+                rows_to_keep = self.frequency_window_map[frequency]
+                filtered = filtered.tail(rows_to_keep)
+                applied_window = True
+        
+        if not applied_window:
+            start_date = latest_timestamp - timedelta(days=self.default_window_days)
+            filtered = filtered[filtered['timestamp'] >= start_date]
+        
+        if filtered.empty:
+            filtered = df.tail(self.default_window_days).copy()
+        
+        filtered = filtered.sort_values('timestamp')
+        filtered.reset_index(drop=True, inplace=True)
+        return filtered
+    
+    def _parse_date(self, value: Any):
+        if not value:
+            return None
+        if isinstance(value, pd.Timestamp):
+            return value.to_pydatetime().date()
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        if hasattr(value, 'date'):
+            try:
+                return value.date()
+            except Exception:
+                return None
+        try:
+            return datetime.strptime(str(value), "%Y-%m-%d").date()
+        except ValueError:
+            return None
+    
+    def _extract_frequency(self, features: Dict[str, Any]) -> Optional[str]:
+        frequency = features.get('interval') or features.get('timespan') or features.get('frequency')
+        if isinstance(frequency, str):
+            return frequency.lower()
+        return None
+    
+    def _safe_int(self, value: Any) -> Optional[int]:
+        try:
+            if value is None:
+                return None
+            return int(value)
+        except (ValueError, TypeError):
+            return None

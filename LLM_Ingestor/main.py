@@ -1,9 +1,10 @@
 """
 Main entry point - Demonstrates the financial data ETL pipeline.
 UPDATED: Handles new return signature (dataframes, enrichment_features, key_features, validation_reports)
+UPDATED: Demonstrates proceed flag handling for non-finance queries
 """
 import os
-from .ingestor import Ingestor
+from ingestor import Ingestor
 
 
 def main():
@@ -11,7 +12,7 @@ def main():
     
     # Configuration
     config = {
-
+        
     }
     
     print("Initializing Financial Data Ingestor...")
@@ -27,34 +28,57 @@ def main():
     
     print("✓ Ingestor ready!\n")
     
-    # Example queries
+    # Example queries demonstrating various features
     examples = [
-        # Stock data examples
-        "Show me Apple's daily stock price for the last 30 days",
-       # "Get Tesla and Microsoft weekly data for the past 3 months",
-       # "I need AAPL intraday prices from January 1, 2024 to January 15, 2024",
+        # Non-finance query (should return proceed=false)
+      #  "What's the best pizza in New York?",
+        
+        # Vague stock query (should use defaults)
+      #  "I want stock data",
+        
+        # Vague query with ticker (1-month daily default)
+       # "Show me AAPL",
+        
+        # Vague economic query (should use CPI/INFLATION defaults)
+       # "Show me economic indicators",
+        
+        # Specific stock query
+     #   "Get Apple's daily stock price for the last 30 days",
         
         # Stock data with technical indicators
-       # "Show me NVDA daily prices with 20-day and 50-day moving averages",
-       # "Get Apple stock with RSI and MACD indicators for the past month",
+     #   "Show me NVDA daily prices with 20-day and 50-day moving averages",
         
-        # Economic indicator examples
-       # "Show me US GDP growth for the last 5 years",
-       # "Get the unemployment rate data quarterly",
+        # Intraday (user specified)
+        "TSLA 5-minute data for today",
+        
+        # Economic indicator
+    #    "Show me US GDP growth for the last 5 years",
+
+        # Economic indicator with multi-column output
+      #  "Show recent US Treasury yield curve data",
     ]
     
     print("=" * 80)
     print("RUNNING EXAMPLE QUERIES")
     print("=" * 80)
     
-    for i, prompt in enumerate(examples[:2], 1):  # Run first 2 to avoid rate limits
-        print(f"\n\nEXAMPLE {i}/{len(examples[:2])}")
+    for i, prompt in enumerate(examples, 1):
+        print(f"\n\nEXAMPLE {i}/{len(examples)}")
         print("-" * 80)
         
         try:
             # ENTRY POINT: Natural language prompt
-            # UPDATED: Now returns 4 outputs
-            dataframes, enrichment_features, key_features, validation_reports = ingestor.process(prompt, verbose=True)
+            # Returns 5 outputs
+            proceed, dataframes, enrichment_features, key_features, validation_reports = ingestor.process(prompt, verbose=True)
+            
+            # Check if we got results
+            if not proceed:
+                print("\n📊 RESULTS: No data returned (non-finance query or error)")
+                continue
+            
+            if not dataframes and not enrichment_features and not key_features:
+                print("\n📊 RESULTS: No data returned (non-finance query or error)")
+                continue
             
             # EXIT POINT: Display results
             print("\n📊 RESULTS:")
@@ -96,16 +120,23 @@ def main():
     print("USAGE GUIDE")
     print("=" * 80)
     print("\nYou can now use the ingestor with any custom query:")
-    print("\n  dataframes, enrichment, key_features, reports = ingestor.process('your query here')")
+    print("\n  proceed, dataframes, enrichment, key_features, reports = ingestor.process('your query here')")
     print("\nExamples:")
-    print("  • dataframes, enrichment, key_features, reports = ingestor.process('Get IBM daily prices')")
-    print("  • dataframes, enrichment, key_features, reports = ingestor.process('Show GDP data')")
-    print("  • dataframes, enrichment, key_features, reports = ingestor.process('Apple with SMA_20')")
+    print("  • proceed, dataframes, enrichment, key_features, reports = ingestor.process('Get IBM daily prices')")
+    print("  • proceed, dataframes, enrichment, key_features, reports = ingestor.process('Show GDP data')")
+    print("  • proceed, dataframes, enrichment, key_features, reports = ingestor.process('Apple with SMA_20')")
     print("\nThe function returns:")
-    print("  1. dataframes: List of pandas DataFrames with the data")
-    print("  2. enrichment_features: List of technical indicators (e.g., ['SMA_20', 'RSI_14'])")
-    print("  3. key_features: List modeling query intent (tickers + keywords + enrichment)")
-    print("  4. validation_reports: List of ValidationReport objects")
+    print("  1. proceed: Boolean flag indicating if the query was finance-related")
+    print("  2. dataframes: List of pandas DataFrames with the data")
+    print("  3. enrichment_features: List of technical indicators (e.g., ['SMA_20', 'RSI_14'])")
+    print("  4. key_features: List modeling query intent (tickers + keywords + enrichment)")
+    print("  5. validation_reports: List of ValidationReport objects")
+    print("\nDefault behaviors:")
+    print("  • Non-finance queries return empty results (proceed=false)")
+    print("  • Vague stock queries without ticker → Polygon FULL_MARKET_SNAPSHOT")
+    print("  • Vague stock queries with ticker → 1-month daily data from both APIs")
+    print("  • Vague economic queries → Polygon INFLATION + Alpha Vantage CPI")
+    print("  • All timestamps are date-only (no time component)")
     print("\n" + "=" * 80)
 
 
