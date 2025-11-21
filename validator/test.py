@@ -38,8 +38,11 @@ print("=" * 70)
 print("\nLoading datasets...")
 logger.info("Loading datasets...")
 try:
-    df1 = pd.read_csv('../../Datasets/Join +/Test 2/DatasetX.csv')
-    df2 = pd.read_csv('../../Datasets/Join +/Test 2/DatasetY.csv')
+    df1 = pd.read_csv('/home/moh/home/thesis_final/data3/Technology/AAPL_balance_sheet_quarterly.csv')
+    df2 = pd.read_csv('/home/moh/home/thesis_final/data3/Technology/AAPL_cash_flow_quarterly.csv')
+    df3 = pd.read_csv('/home/moh/home/thesis_final/data3/Technology/AAPL_earnings_quarterly.csv')
+    df4 = pd.read_csv('/home/moh/home/thesis_final/data3/Technology/AAPL_income_statement_quarterly.csv')
+    df5 = pd.read_csv('/home/moh/home/thesis_final/AAPL.csv')
 
     msg1 = f"✓ Dataset 1: {df1.shape[0]:,} rows × {df1.shape[1]} columns"
     msg2 = f"✓ Dataset 2: {df2.shape[0]:,} rows × {df2.shape[1]} columns"
@@ -68,7 +71,7 @@ logger.info("PERFORMANCE TEST")
 start_time = time.time()
 
 validator = Validator()
-output, report = validator.process([df1, df2])
+output, report = validator.process([df1, df2,df3,df4,df5])
 
 elapsed = time.time() - start_time
 

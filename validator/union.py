@@ -12,7 +12,7 @@ from difflib import SequenceMatcher
 import torch
 from transformers import AutoTokenizer, AutoModel
 
-from .config import ValidatorConfig
+from config import ValidatorConfig
 
 
 

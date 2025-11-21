@@ -1,0 +1,388 @@
+2025-11-20 13:44:06,069 - INFO - ======================================================================
+2025-11-20 13:44:06,070 - INFO - OPTIMIZED VALIDATOR TEST STARTED
+2025-11-20 13:44:06,070 - INFO - Timestamp: 2025-11-20 13:44:06.070166
+2025-11-20 13:44:06,070 - INFO - ======================================================================
+======================================================================
+OPTIMIZED VALIDATOR TEST
+======================================================================
+
+Loading datasets...
+2025-11-20 13:44:06,070 - INFO - Loading datasets...
+✓ Dataset 1: 20 rows × 38 columns
+✓ Dataset 2: 20 rows × 29 columns
+  Total pairs to process: 400
+2025-11-20 13:44:06,074 - INFO - ✓ Dataset 1: 20 rows × 38 columns
+2025-11-20 13:44:06,074 - INFO - ✓ Dataset 2: 20 rows × 29 columns
+2025-11-20 13:44:06,074 - INFO -   Total pairs to process: 400
+
+======================================================================
+PERFORMANCE TEST
+======================================================================
+2025-11-20 13:44:06,074 - INFO - PERFORMANCE TEST
+2025-11-20 13:44:06,074 - INFO - Initializing Validator...
+2025-11-20 13:44:06,110 - INFO - Union model loaded successfully
+2025-11-20 13:44:09,273 - INFO - FinBERT loaded successfully
+2025-11-20 13:44:10,749 - INFO - Join model loaded successfully
+2025-11-20 13:44:10,750 - INFO - Validator initialized successfully
+2025-11-20 13:44:10,750 - DEBUG - Input validation passed: 3 dataframes
+
+======================================================================
+VALIDATOR PIPELINE STARTED
+======================================================================
+
+Input: 3 dataframes
+  DF0: 20 rows × 38 columns
+       Columns: ['accumulatedDepreciationAmortizationPPE', 'capitalLeaseObligations', 'cashAndCashEquivalentsAtCarryingValue', 'cashAndShortTermInvestments', 'commonStock'] ...
+  DF1: 20 rows × 29 columns
+       Columns: ['capitalExpenditures', 'cashflowFromFinancing', 'cashflowFromInvestment', 'changeInCashAndCashEquivalents', 'changeInExchangeRate'] ...
+  DF2: 20 rows × 26 columns
+       Columns: ['comprehensiveIncomeNetOfTax', 'costOfRevenue', 'costofGoodsAndServicesSold', 'depreciation', 'depreciationAndAmortization'] ...
+2025-11-20 13:44:10,751 - INFO - ============================================================
+2025-11-20 13:44:10,751 - INFO - VALIDATOR PIPELINE STARTED
+2025-11-20 13:44:10,751 - INFO - Input: 3 dataframes
+2025-11-20 13:44:10,751 - INFO -   DF0: (20, 38)
+2025-11-20 13:44:10,751 - INFO -   DF1: (20, 29)
+2025-11-20 13:44:10,751 - INFO -   DF2: (20, 26)
+2025-11-20 13:44:10,751 - INFO - ============================================================
+
+======================================================================
+STAGE 1: UNION (Vertical Concatenation - Similar Columns)
+======================================================================
+
+Attempting to stack dataframes with similar column structures...
+2025-11-20 13:44:10,751 - INFO - 
+2025-11-20 13:44:10,751 - INFO - ============================================================
+2025-11-20 13:44:10,751 - INFO - UNION STAGE
+2025-11-20 13:44:10,752 - INFO - ============================================================
+
+  Processing Group0 (starting with (20, 38)):
+
+  Checking Group0 × DF0:
+  → DF1: 38 columns
+  → DF2: 29 columns
+  → Matched 4/29 columns from DF2 to DF1
+  → Average similarity score: 0.865
+    • 'cashflowFromInvestment' → 'shortTermInvestments'
+    • 'changeInReceivables' → 'currentNetReceivables'
+    • 'fiscalDateEnding' → 'fiscalDateEnding'
+    ... and 1 more
+  → Coverage score: 0.119 (harmonic mean of match ratios)
+  ✗ UNION not compatible (coverage 0.119 < 0.7)
+
+  Checking Group0 × DF1:
+  → DF1: 38 columns
+  → DF2: 26 columns
+  → Matched 3/26 columns from DF2 to DF1
+  → Average similarity score: 0.919
+    • 'depreciationAndAmortization' → 'accumulatedDepreciationAmortizationPPE'
+    • 'fiscalDateEnding' → 'fiscalDateEnding'
+    • 'reportedCurrency' → 'reportedCurrency'
+  → Coverage score: 0.094 (harmonic mean of match ratios)
+  ✗ UNION not compatible (coverage 0.094 < 0.7)
+
+  → Group0 kept separate: (20, 38) (no compatible dataframes)
+
+  Processing Group1 (starting with (20, 29)):
+
+  Checking Group1 × DF0:
+  → DF1: 29 columns
+  → DF2: 26 columns
+  → Matched 8/26 columns from DF2 to DF1
+  → Average similarity score: 0.857
+    • 'depreciationAndAmortization' → 'depreciationDepletionAndAmortization'
+    • 'fiscalDateEnding' → 'fiscalDateEnding'
+    • 'interestIncome' → 'netIncome'
+    ... and 5 more
+  → Coverage score: 0.291 (harmonic mean of match ratios)
+  ✗ UNION not compatible (coverage 0.291 < 0.7)
+
+  → Group1 kept separate: (20, 29) (no compatible dataframes)
+
+  Processing Group2 (starting with (20, 26)):
+
+  → Group2 kept separate: (20, 26) (no compatible dataframes)
+
+  UNION STAGE COMPLETE: 3 input → 3 output groups
+2025-11-20 13:47:02,684 - INFO - Union complete: 3 → 3 groups
+
+  Removing duplicates from all groups...
+    → Group 0: No duplicates found (20 rows)
+    → Group 1: No duplicates found (20 rows)
+    → Group 2: No duplicates found (20 rows)
+
+  ✓ No duplicates found in any group
+
+UNION RESULT: 3 dataframes → 3 groups
+  Group0: 20 rows × 38 columns
+  Group1: 20 rows × 29 columns
+  Group2: 20 rows × 26 columns
+2025-11-20 13:47:02,692 - INFO - UNION complete: 3 → 3 dataframes
+2025-11-20 13:47:02,693 - INFO -   Group0: (20, 38)
+2025-11-20 13:47:02,693 - INFO -   Group1: (20, 29)
+2025-11-20 13:47:02,693 - INFO -   Group2: (20, 26)
+
+======================================================================
+STAGE 2: JOIN (Horizontal Concatenation - Compatible Rows)
+======================================================================
+
+3 groups remaining after union - attempting to join...
+2025-11-20 13:47:02,693 - INFO - 
+2025-11-20 13:47:02,693 - INFO - ============================================================
+2025-11-20 13:47:02,693 - INFO - JOIN STAGE
+2025-11-20 13:47:02,693 - INFO - ============================================================
+
+Join denominator (minimum row count): 20 rows
+(Retention = unique_row_coverage / 20)
+2025-11-20 13:47:02,693 - INFO - Join denominator: 20 rows
+
+----------------------------------------------------------------------
+JOIN STAGE 1: Initial Pairwise Joins
+----------------------------------------------------------------------
+
+Finding best join partner for each group...
+2025-11-20 13:47:02,693 - INFO - 
+2025-11-20 13:47:02,693 - INFO - ------------------------------------------------------------
+2025-11-20 13:47:02,693 - INFO - JOIN STAGE 1: Initial Pairwise Joins
+2025-11-20 13:47:02,693 - INFO - ------------------------------------------------------------
+
+======================================================================
+JOIN STAGE 1: Initial Pairwise Joins
+======================================================================
+
+──────────────────────────────────────────────────────────────────────
+Processing Group 0 (20 rows × 38 cols)
+──────────────────────────────────────────────────────────────────────
+
+  Checking Group 0 × Group 1:
+
+Finding compatible rows between datasets (CPU MODE):
+  [1/5] Aligning columns...
+  → Processing 20 × 20 = 400 row pairs
+  → Aligned to 63 numeric features
+  [2/5] Converting to NumPy arrays...
+  [3/5] Extracting features (using 20 cores)...
+  → Created 20 chunks for parallel processing
+  → Extracted features for 0 pairs in 7.5s
+  ✗ No valid feature pairs (all contained NaN)
+
+  Checking Group 0 × Group 2:
+
+Finding compatible rows between datasets (CPU MODE):
+  [1/5] Aligning columns...
+  → Processing 20 × 20 = 400 row pairs
+  → Aligned to 60 numeric features
+  [2/5] Converting to NumPy arrays...
+  [3/5] Extracting features (using 20 cores)...
+  → Created 20 chunks for parallel processing
+  → Extracted features for 0 pairs in 4.9s
+  ✗ No valid feature pairs (all contained NaN)
+
+  ✗ No compatible partner found for Group 0
+
+──────────────────────────────────────────────────────────────────────
+Processing Group 1 (20 rows × 29 cols)
+──────────────────────────────────────────────────────────────────────
+
+  Checking Group 1 × Group 2:
+
+Finding compatible rows between datasets (CPU MODE):
+  [1/5] Aligning columns...
+  → Processing 20 × 20 = 400 row pairs
+  → Aligned to 50 numeric features
+  [2/5] Converting to NumPy arrays...
+  [3/5] Extracting features (using 20 cores)...
+  → Created 20 chunks for parallel processing
+  → Extracted features for 0 pairs in 4.3s
+  ✗ No valid feature pairs (all contained NaN)
+
+  ✗ No compatible partner found for Group 1
+
+──────────────────────────────────────────────────────────────────────
+Processing Group 2 (20 rows × 26 cols)
+──────────────────────────────────────────────────────────────────────
+
+  ✗ No compatible partner found for Group 2
+
+  → Group 0 kept separate (no compatible partners)
+
+  → Group 1 kept separate (no compatible partners)
+
+  → Group 2 kept separate (no compatible partners)
+
+======================================================================
+STAGE 1 COMPLETE: 3 groups → 3 outputs
+  ✗ No joins succeeded (all groups incompatible)
+======================================================================
+
+STAGE 1 RESULT: 3 groups → 3 groups
+  Result0: 20 rows × 38 columns
+  Result1: 20 rows × 29 columns
+  Result2: 20 rows × 26 columns
+2025-11-20 13:47:19,466 - INFO - Stage 1 complete: 3 → 3 dataframes
+2025-11-20 13:47:19,466 - INFO -   Result0: (20, 38)
+2025-11-20 13:47:19,467 - INFO -   Result1: (20, 29)
+2025-11-20 13:47:19,467 - INFO -   Result2: (20, 26)
+
+======================================================================
+SKIPPING JOIN STAGE 2
+======================================================================
+
+✗ No compatible joins found in Stage 1
+  All groups are incompatible with each other
+  Stage 2 would not find any matches either
+
+  Returning Stage 1 outputs as final results
+2025-11-20 13:47:19,467 - INFO - 
+2025-11-20 13:47:19,467 - INFO - ============================================================
+2025-11-20 13:47:19,467 - INFO - SKIPPING STAGE 2: No joins succeeded in Stage 1
+2025-11-20 13:47:19,467 - INFO - ============================================================
+
+======================================================================
+CREATING VERSIONED OUTPUTS
+======================================================================
+
+Splitting dataframes with duplicate columns (_x/_y suffixes)...
+2025-11-20 13:47:19,467 - INFO - 
+2025-11-20 13:47:19,467 - INFO - ============================================================
+2025-11-20 13:47:19,467 - INFO - CREATING VERSIONED OUTPUTS
+2025-11-20 13:47:19,467 - INFO - ============================================================
+
+  DataFrame 0:
+    → No duplicate columns found
+    → Keeping original: 20 rows × 38 columns
+2025-11-20 13:47:19,467 - INFO - DataFrame 0: No duplicates, keeping original ((20, 38))
+
+  DataFrame 1:
+    → No duplicate columns found
+    → Keeping original: 20 rows × 29 columns
+2025-11-20 13:47:19,468 - INFO - DataFrame 1: No duplicates, keeping original ((20, 29))
+
+  DataFrame 2:
+    → No duplicate columns found
+    → Keeping original: 20 rows × 26 columns
+2025-11-20 13:47:19,468 - INFO - DataFrame 2: No duplicates, keeping original ((20, 26))
+
+  VERSIONING COMPLETE: 3 input → 3 output dataframes
+======================================================================
+2025-11-20 13:47:19,468 - INFO - Versioning complete: 3 → 3 dataframes
+2025-11-20 13:47:19,468 - INFO - ============================================================
+
+======================================================================
+VALIDATOR PIPELINE COMPLETE
+======================================================================
+
+Final Summary:
+  Input:  3 dataframes
+  Output: 3 dataframe(s)
+
+  Output 0: 20 rows × 38 columns
+  Output 1: 20 rows × 29 columns
+  Output 2: 20 rows × 26 columns
+
+======================================================================
+
+
+======================================================================
+PERFORMANCE RESULTS
+======================================================================
+Total time: 193.4 seconds (3.22 minutes)
+2025-11-20 13:47:19,468 - INFO - Total time: 193.4 seconds (3.22 minutes)
+
+======================================================================
+CORRECTNESS VALIDATION
+======================================================================
+
+Number of output dataframes: 3
+
+Output DataFrame 0:
+  Shape: 20 rows × 38 columns
+  Columns: ['accumulatedDepreciationAmortizationPPE', 'capitalLeaseObligations', 'cashAndCashEquivalentsAtCarryingValue', 'cashAndShortTermInvestments', 'commonStock', 'commonStockSharesOutstanding', 'currentAccountsPayable', 'currentDebt', 'currentLongTermDebt', 'currentNetReceivables']...
+  Numeric columns: 36/38
+
+Output DataFrame 1:
+  Shape: 20 rows × 29 columns
+  Columns: ['capitalExpenditures', 'cashflowFromFinancing', 'cashflowFromInvestment', 'changeInCashAndCashEquivalents', 'changeInExchangeRate', 'changeInInventory', 'changeInOperatingAssets', 'changeInOperatingLiabilities', 'changeInReceivables', 'depreciationDepletionAndAmortization']...
+  Numeric columns: 27/29
+
+Output DataFrame 2:
+  Shape: 20 rows × 26 columns
+  Columns: ['comprehensiveIncomeNetOfTax', 'costOfRevenue', 'costofGoodsAndServicesSold', 'depreciation', 'depreciationAndAmortization', 'ebit', 'ebitda', 'fiscalDateEnding', 'grossProfit', 'incomeBeforeTax']...
+  Numeric columns: 24/26
+
+======================================================================
+DETAILED REPORT
+======================================================================
+============================================================
+VALIDATOR SUMMARY
+============================================================
+
+Input: 3 dataframes
+  DF0: 20 rows × 38 columns
+  DF1: 20 rows × 29 columns
+  DF2: 20 rows × 26 columns
+
+Union Operations: 0
+
+Early Termination: NO
+
+Join Stage 1: 3 operations
+  - DF 0: no compatible partner
+  - DF 1: no compatible partner
+  - DF 2: no compatible partner
+
+Join Stage 2: SKIPPED (no Stage 1 joins succeeded)
+
+Output: 3 dataframe(s)
+  Output0: 20 rows × 38 columns
+  Output1: 20 rows × 29 columns
+  Output2: 20 rows × 26 columns
+============================================================
+
+======================================================================
+TEST COMPLETE
+======================================================================
+2025-11-20 13:47:19,468 - INFO - TEST COMPLETE
+
+======================================================================
+SAVING OUTPUTS TO CSV
+======================================================================
+
+Output directory: /home/moh/home/thesis_final/Dynamic-ETL-Pipeline_Thesis_II/validator/outputs
+
+  ✓ Saved output 0:
+    File: result_0.csv
+    Path: /home/moh/home/thesis_final/Dynamic-ETL-Pipeline_Thesis_II/validator/outputs/result_0.csv
+    Size: 20 rows × 38 columns
+2025-11-20 13:47:19,474 - INFO - Saved output 0 to outputs/result_0.csv
+
+  ✓ Saved output 1:
+    File: result_1.csv
+    Path: /home/moh/home/thesis_final/Dynamic-ETL-Pipeline_Thesis_II/validator/outputs/result_1.csv
+    Size: 20 rows × 29 columns
+2025-11-20 13:47:19,475 - INFO - Saved output 1 to outputs/result_1.csv
+
+  ✓ Saved output 2:
+    File: result_2.csv
+    Path: /home/moh/home/thesis_final/Dynamic-ETL-Pipeline_Thesis_II/validator/outputs/result_2.csv
+    Size: 20 rows × 26 columns
+2025-11-20 13:47:19,475 - INFO - Saved output 2 to outputs/result_2.csv
+
+======================================================================
+SAVED 3/3 FILES
+======================================================================
+
+  Saved files: 3
+2025-11-20 13:47:19,475 - INFO - Saved files: 3
+
+Saved files:
+2025-11-20 13:47:19,475 - INFO - Saved files:
+  • outputs/result_0.csv
+2025-11-20 13:47:19,475 - INFO -   • outputs/result_0.csv
+  • outputs/result_1.csv
+2025-11-20 13:47:19,475 - INFO -   • outputs/result_1.csv
+  • outputs/result_2.csv
+2025-11-20 13:47:19,476 - INFO -   • outputs/result_2.csv
+2025-11-20 13:47:19,476 - INFO - ======================================================================
+2025-11-20 13:47:19,476 - INFO - TEST SESSION COMPLETE
+2025-11-20 13:47:19,476 - INFO - ======================================================================
+2025-11-20 13:47:19,476 - INFO - 

@@ -2,6 +2,7 @@
 Configuration for Validator Component
 Contains all thresholds, paths, and settings including parallel processing
 """
+from typing import Optional
 
 class ValidatorConfig:
     """Configuration class for Validator operations"""
@@ -30,7 +31,9 @@ class ValidatorConfig:
     }
     DEFAULT_QUALITY_PROFILE = "balanced"
 
-    def __init__(self, quality_profile: str | None = None):
+
+
+    def __init__(self, quality_profile: Optional[str] = None):
         self.current_quality_profile = self.DEFAULT_QUALITY_PROFILE
         self.apply_quality_profile(quality_profile or self.DEFAULT_QUALITY_PROFILE)
     

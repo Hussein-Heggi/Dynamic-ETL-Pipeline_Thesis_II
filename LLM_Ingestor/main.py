@@ -12,7 +12,7 @@ def main():
     
     # Configuration
     config = {
-        
+
     }
     
     print("Initializing Financial Data Ingestor...")
@@ -31,31 +31,34 @@ def main():
     # Example queries demonstrating various features
     examples = [
         # Non-finance query (should return proceed=false)
-      #  "What's the best pizza in New York?",
+    #    "What's the best pizza in New York?",
         
         # Vague stock query (should use defaults)
-      #  "I want stock data",
+    #    "I want stock data",
         
         # Vague query with ticker (1-month daily default)
-       # "Show me AAPL",
+    #    "Show me AAPL",
         
         # Vague economic query (should use CPI/INFLATION defaults)
-       # "Show me economic indicators",
+    #   "Show me economic indicators",
         
         # Specific stock query
-     #   "Get Apple's daily stock price for the last 30 days",
+     #  "Get Apple's daily stock price for the last 30 days",
         
         # Stock data with technical indicators
      #   "Show me NVDA daily prices with 20-day and 50-day moving averages",
         
         # Intraday (user specified)
-        "TSLA 5-minute data for today",
+        #"TSLA 5-minute data for today",
+      #  "show me all the financial data for apple",
+      #  "i want the income statement for google, and the stock price for microsoft",
         
         # Economic indicator
-    #    "Show me US GDP growth for the last 5 years",
+      # "Show me US GDP growth for the last 5 years",
 
         # Economic indicator with multi-column output
       #  "Show recent US Treasury yield curve data",
+      "Compare US inflation with AAPL's monthly adjusted returns over the last 10 years. I want datasets for both"
     ]
     
     print("=" * 80)
@@ -84,6 +87,19 @@ def main():
             print("\n📊 RESULTS:")
             print(f"\nEnrichment Features: {enrichment_features}")
             print(f"Key Features (Query Intent): {key_features}")
+            
+            # Display LLM's parameter selections
+            if ingestor.last_llm_response and ingestor.last_llm_response.api_requests:
+                print(f"\n🔧 LLM Parameter Selections:")
+                for j, api_req in enumerate(ingestor.last_llm_response.api_requests, 1):
+                    print(f"\n  Request {j}:")
+                    print(f"    API: {api_req.api_name}")
+                    print(f"    Endpoint: {api_req.endpoint_name}")
+                    print(f"    Parameters:")
+                    for param_key, param_value in api_req.parameters.items():
+                        print(f"      - {param_key}: {param_value}")
+                    if api_req.reasoning:
+                        print(f"    Reasoning: {api_req.reasoning}")
             
             print(f"\n📋 Validation Reports:")
             for j, report in enumerate(validation_reports, 1):

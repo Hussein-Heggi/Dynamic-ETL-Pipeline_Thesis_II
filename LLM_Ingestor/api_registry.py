@@ -1005,6 +1005,303 @@ def build_alpha_vantage_api() -> APISpec:
                 parameter_mappings={},
                 alternative_endpoints=[]
             ),
+
+            # =============================================================
+            # FUNDAMENTAL DATA ENDPOINTS
+            # =============================================================
+            # Company Overview
+            EndpointSpec(
+                name="OVERVIEW",
+                description="Comprehensive fundamental snapshot (sector, market cap, valuation ratios, profitability metrics, beta, share counts) for the specified equity",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="symbol",
+                        type=ParameterType.STRING,
+                        required=True,
+                        description="Stock or equity ticker symbol",
+                        aliases=["ticker", "stock"]
+                    ),
+                ],
+                parameter_mappings={
+                    "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # ETF Profile & Holdings
+            EndpointSpec(
+                name="ETF_PROFILE",
+                description="Detailed ETF fundamentals including strategy description, top holdings, asset/sector allocation weights, expense ratio, and issuance details",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="symbol",
+                        type=ParameterType.STRING,
+                        required=True,
+                        description="ETF ticker symbol",
+                        aliases=["ticker", "stock"]
+                    ),
+                ],
+                parameter_mappings={
+                    "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # Corporate Action - Dividends
+            EndpointSpec(
+                name="DIVIDENDS",
+                description="Complete dividend history including declaration/ex-date, payment date, currency, and amount for the specified equity",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="symbol",
+                        type=ParameterType.STRING,
+                        required=True,
+                        description="Stock ticker symbol",
+                        aliases=["ticker", "stock"]
+                    ),
+                    ParameterSchema(
+                        name="datatype",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
+                    ),
+                ],
+                parameter_mappings={
+                    "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # Corporate Action - Splits
+            EndpointSpec(
+                name="SPLITS",
+                description="Historical stock split events with split ratios and effective dates for the specified equity",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="symbol",
+                        type=ParameterType.STRING,
+                        required=True,
+                        description="Stock ticker symbol",
+                        aliases=["ticker", "stock"]
+                    ),
+                    ParameterSchema(
+                        name="datatype",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
+                    ),
+                ],
+                parameter_mappings={
+                    "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # Income Statement
+            EndpointSpec(
+                name="INCOME_STATEMENT",
+                description="Annual and quarterly income statements with GAAP/IFRS normalized revenue, gross profit, operating income, net income, EPS, and margin metrics",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="symbol",
+                        type=ParameterType.STRING,
+                        required=True,
+                        description="Stock ticker symbol",
+                        aliases=["ticker", "stock"]
+                    ),
+                ],
+                parameter_mappings={
+                    "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # Balance Sheet
+            EndpointSpec(
+                name="BALANCE_SHEET",
+                description="Annual and quarterly balance sheets highlighting assets, liabilities, shareholder equity, working capital, and leverage metrics",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="symbol",
+                        type=ParameterType.STRING,
+                        required=True,
+                        description="Stock ticker symbol",
+                        aliases=["ticker", "stock"]
+                    ),
+                ],
+                parameter_mappings={
+                    "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # Cash Flow Statement
+            EndpointSpec(
+                name="CASH_FLOW",
+                description="Annual and quarterly cash flow statements detailing operating, investing, financing flows plus free-cash-flow metrics",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="symbol",
+                        type=ParameterType.STRING,
+                        required=True,
+                        description="Stock ticker symbol",
+                        aliases=["ticker", "stock"]
+                    ),
+                ],
+                parameter_mappings={
+                    "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # Shares Outstanding
+            EndpointSpec(
+                name="SHARES_OUTSTANDING",
+                description="Quarterly basic and diluted shares outstanding plus source type to support per-share fundamental calculations",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="symbol",
+                        type=ParameterType.STRING,
+                        required=True,
+                        description="Stock ticker symbol",
+                        aliases=["ticker", "stock"]
+                    ),
+                    ParameterSchema(
+                        name="datatype",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Response data format",
+                        valid_values=["json", "csv"],
+                        default_value="json"
+                    ),
+                ],
+                parameter_mappings={
+                    "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # Earnings History
+            EndpointSpec(
+                name="EARNINGS",
+                description="Annual and quarterly earnings (EPS) history including actual vs. estimate, surprise percentages, and announcement dates",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="symbol",
+                        type=ParameterType.STRING,
+                        required=True,
+                        description="Stock ticker symbol",
+                        aliases=["ticker", "stock"]
+                    ),
+                ],
+                parameter_mappings={
+                    "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # Earnings Estimates
+            EndpointSpec(
+                name="EARNINGS_ESTIMATES",
+                description="Forward EPS and revenue consensus estimates with analyst counts, revision trends, and confidence metrics",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="symbol",
+                        type=ParameterType.STRING,
+                        required=True,
+                        description="Stock ticker symbol",
+                        aliases=["ticker", "stock"]
+                    ),
+                ],
+                parameter_mappings={
+                    "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # Listing & Delisting Status
+            EndpointSpec(
+                name="LISTING_STATUS",
+                description="Regulatory listing roster showing active vs. delisted US equities/ETFs with IPO dates and status change timestamps",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="date",
+                        type=ParameterType.DATE,
+                        required=False,
+                        description="Specific date (YYYY-MM-DD) to query historical listing status since 2010-01-01",
+                        aliases=["as_of_date", "on_date"],
+                        format="YYYY-MM-DD"
+                    ),
+                    ParameterSchema(
+                        name="state",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Listing state to filter by",
+                        valid_values=["active", "delisted"],
+                        default_value="active"
+                    ),
+                ],
+                parameter_mappings={
+                    "date": ParameterMapping(source="extracted_entities.time_range.from_date")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # Earnings Calendar
+            EndpointSpec(
+                name="EARNINGS_CALENDAR",
+                description="Forward-looking earnings calendar containing announcement dates, estimated EPS, prior-year comparisons, and time-of-day info",
+                data_category="stock",
+                parameters=[
+                    ParameterSchema(
+                        name="symbol",
+                        type=ParameterType.STRING,
+                        required=False,
+                        description="Optional stock ticker symbol to filter earnings calendar",
+                        aliases=["ticker", "stock"]
+                    ),
+                    ParameterSchema(
+                        name="horizon",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Time horizon to look ahead for earnings events",
+                        valid_values=["3month", "6month", "12month"],
+                        default_value="3month"
+                    ),
+                ],
+                parameter_mappings={
+                    "symbol": ParameterMapping(source="extracted_entities.tickers[0]"),
+                    "horizon": ParameterMapping(source="extracted_entities.time_range.duration")
+                },
+                alternative_endpoints=[]
+            ),
+
+            # IPO Calendar
+            EndpointSpec(
+                name="IPO_CALENDAR",
+                description="Pipeline of expected IPOs with filing date, expected pricing window, lead underwriters, and share counts for the next three months",
+                data_category="stock",
+                parameters=[
+                    # no additional parameters required
+                ],
+                parameter_mappings={},
+                alternative_endpoints=[]
+            ),
         ]
     )
 

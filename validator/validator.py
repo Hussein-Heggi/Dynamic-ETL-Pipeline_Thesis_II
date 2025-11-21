@@ -6,9 +6,9 @@ import pandas as pd
 from typing import List, Tuple, Dict, Optional
 import logging
 
-from .config import ValidatorConfig
-from .union import UnionEngine
-from .join import JoinEngine
+from config import ValidatorConfig
+from union import UnionEngine
+from join import JoinEngine
 
 
 class Validator:

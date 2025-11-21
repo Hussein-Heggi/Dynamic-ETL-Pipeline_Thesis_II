@@ -1,0 +1,68 @@
+2025-11-20 21:34:24,105 - INFO - ======================================================================
+2025-11-20 21:34:24,105 - INFO - OPTIMIZED VALIDATOR TEST STARTED
+2025-11-20 21:34:24,105 - INFO - Timestamp: 2025-11-20 21:34:24.105552
+2025-11-20 21:34:24,105 - INFO - ======================================================================
+======================================================================
+OPTIMIZED VALIDATOR TEST
+======================================================================
+
+Loading datasets...
+2025-11-20 21:34:24,105 - INFO - Loading datasets...
+✓ Dataset 1: 81 rows × 38 columns
+✓ Dataset 2: 81 rows × 29 columns
+  Total pairs to process: 6,561
+2025-11-20 21:34:24,814 - INFO - ✓ Dataset 1: 81 rows × 38 columns
+2025-11-20 21:34:24,814 - INFO - ✓ Dataset 2: 81 rows × 29 columns
+2025-11-20 21:34:24,814 - INFO -   Total pairs to process: 6,561
+
+======================================================================
+PERFORMANCE TEST
+======================================================================
+2025-11-20 21:34:24,814 - INFO - PERFORMANCE TEST
+2025-11-20 21:34:24,814 - INFO - Initializing Validator...
+2025-11-20 21:34:25,045 - INFO - Union model loaded successfully
+2025-11-20 21:34:33,486 - INFO - FinBERT loaded successfully
+2025-11-20 21:34:33,487 - INFO - Join model loaded successfully
+2025-11-20 21:34:33,487 - INFO - Validator initialized successfully
+2025-11-20 21:34:33,487 - DEBUG - Input validation passed: 5 dataframes
+
+======================================================================
+VALIDATOR PIPELINE STARTED
+======================================================================
+
+Input: 5 dataframes
+  DF0: 81 rows × 38 columns
+       Columns: ['accumulatedDepreciationAmortizationPPE', 'capitalLeaseObligations', 'cashAndCashEquivalentsAtCarryingValue', 'cashAndShortTermInvestments', 'commonStock'] ...
+  DF1: 81 rows × 29 columns
+       Columns: ['capitalExpenditures', 'cashflowFromFinancing', 'cashflowFromInvestment', 'changeInCashAndCashEquivalents', 'changeInExchangeRate'] ...
+  DF2: 119 rows × 7 columns
+       Columns: ['estimatedEPS', 'fiscalDateEnding', 'reportTime', 'reportedDate', 'reportedEPS'] ...
+  DF3: 81 rows × 26 columns
+       Columns: ['comprehensiveIncomeNetOfTax', 'costOfRevenue', 'costofGoodsAndServicesSold', 'depreciation', 'depreciationAndAmortization'] ...
+  DF4: 987754 rows × 8 columns
+       Columns: ['volume', 'vwap', 'open', 'close', 'high'] ...
+2025-11-20 21:34:33,487 - INFO - ============================================================
+2025-11-20 21:34:33,487 - INFO - VALIDATOR PIPELINE STARTED
+2025-11-20 21:34:33,487 - INFO - Input: 5 dataframes
+2025-11-20 21:34:33,488 - INFO -   DF0: (81, 38)
+2025-11-20 21:34:33,488 - INFO -   DF1: (81, 29)
+2025-11-20 21:34:33,488 - INFO -   DF2: (119, 7)
+2025-11-20 21:34:33,488 - INFO -   DF3: (81, 26)
+2025-11-20 21:34:33,488 - INFO -   DF4: (987754, 8)
+2025-11-20 21:34:33,488 - INFO - ============================================================
+
+======================================================================
+STAGE 1: UNION (Vertical Concatenation - Similar Columns)
+======================================================================
+
+Attempting to stack dataframes with similar column structures...
+2025-11-20 21:34:33,488 - INFO - 
+2025-11-20 21:34:33,488 - INFO - ============================================================
+2025-11-20 21:34:33,488 - INFO - UNION STAGE
+2025-11-20 21:34:33,488 - INFO - ============================================================
+
+  Processing Group0 (starting with (81, 38)):
+
+  Checking Group0 × DF0:
+  → DF1: 38 columns
+  → DF2: 29 columns

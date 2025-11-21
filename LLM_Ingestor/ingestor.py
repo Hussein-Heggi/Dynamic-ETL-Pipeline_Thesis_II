@@ -19,9 +19,9 @@ class Ingestor:
     
     def __init__(
         self,
-        openai_api_key: str,
-        polygon_api_key: str,
-        alpha_vantage_api_key: str,
+        openai_api_key: str= "",
+        polygon_api_key: str='',
+        alpha_vantage_api_key: str= '',
         openai_model: str = "gpt-5-nano",
         temperature: float = None,
         semantic_threshold: float = 0.7
@@ -30,6 +30,9 @@ class Ingestor:
         self.endpoint_validator = EndpointValidator(semantic_threshold)
         self.parameter_validator = ParameterValidator()
         self.output_validator = OutputValidator()
+        
+        # Store last LLM response for inspection
+        self.last_llm_response = None
         
         from polygon_client import PolygonClient
         from alpha_vantage_client import AlphaVantageClient
@@ -57,6 +60,9 @@ class Ingestor:
             print("\n[1/5] Analyzing query with LLM...")
         
         llm_response = self.query_analyzer.analyze(prompt)
+        
+        # Store for inspection
+        self.last_llm_response = llm_response
         
         # Check proceed flag
         if not llm_response.proceed:
