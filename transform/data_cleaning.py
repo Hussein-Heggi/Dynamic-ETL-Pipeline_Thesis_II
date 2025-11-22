@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 import logging
-from typing import Any, Dict, Tuple, Union
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from pandera import Check, Column
-from pandera import pandas as pa
 
 # Optional: Configure logging to see reports in your console/notebook output
 logging.basicConfig(
@@ -15,309 +16,550 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Legacy constant for backward compatibility
 REQUIRED_COLS = ["ticker", "ts", "open", "high", "low", "close", "volume"]
 
 
-def clean_stock_bars(
-    df: pd.DataFrame, column_delete_threshold: float = 0.5
-) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+# --- Configuration-Based Cleaning Helper Functions ---
+
+
+def load_cleaning_config(config_path: str | Path = Path(__file__).parent / "cleaning_config.json") -> Dict[str, Any]:
     """
-    No-exception cleaner:
-     - keeps tz-aware UTC in 'ts'
-     - drops exact duplicate rows only
-     - handles null values based on column_delete_threshold:
-       * if column null_ratio > threshold: delete entire column
-       * if column null_ratio <= threshold: impute missing values
-     - hard-drops invalid rows (future ts, negative/zero prices, bad high/low, negative volume)
-     - soft-fixes vwap (set NaN if out of [low, high]) and transactions (nullable Int64, <0 -> NA)
-     - returns (clean_df, report)
+    Load cleaning configuration from JSON file.
+
+    Args:
+        config_path: Path to config JSON file.
+
+    Returns:
+        Dictionary containing configuration
+    """
+    # Handle None case - use default path
+    if config_path is None:
+        config_path = Path(__file__).parent / "cleaning_config.json"
+
+    try:
+        with open(config_path, "r") as f:
+            config = json.load(f)
+        logger.debug(f"Loaded cleaning config from {config_path}")
+        return config
+    except FileNotFoundError:
+        logger.warning(f"Config file not found at {config_path}, using minimal default config")
+        # Return minimal default configuration
+        return {
+            "version": 1,
+            "global_settings": {
+                "default_null_threshold": 0.5,
+                "default_allow_column_deletion": True,
+                "default_imputation_strategy": "auto",
+                "remove_duplicates": False,
+            },
+            "column_rules": [
+                {
+                    "pattern": ".*",
+                    "dtype": "auto",
+                    "null_threshold": 0.5,
+                    "imputation_strategy": "auto",
+                    "allow_column_deletion": True,
+                    "validations": [],
+                }
+            ],
+            "relationship_validations": [],
+        }
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse config file: {e}")
+        raise
+
+
+def match_column_rule(column_name: str, config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Find the first matching rule for a column based on regex patterns.
+
+    Args:
+        column_name: Name of the column to match
+        config: Cleaning configuration dictionary
+
+    Returns:
+        Dictionary containing the matched rule with defaults applied
+    """
+    global_settings = config.get("global_settings", {})
+    column_rules = config.get("column_rules", [])
+
+    # Find first matching pattern
+    for rule in column_rules:
+        pattern = rule.get("pattern", "")
+        if re.match(pattern, column_name):
+            # Merge with global defaults
+            matched_rule = {
+                "pattern": pattern,
+                "dtype": rule.get("dtype", "auto"),
+                "null_threshold": rule.get(
+                    "null_threshold", global_settings.get("default_null_threshold", 0.5)
+                ),
+                "allow_column_deletion": rule.get(
+                    "allow_column_deletion",
+                    global_settings.get("default_allow_column_deletion", True),
+                ),
+                "imputation_strategy": rule.get(
+                    "imputation_strategy",
+                    global_settings.get("default_imputation_strategy", "auto"),
+                ),
+                "imputation_value": rule.get("imputation_value", None),
+                "validations": rule.get("validations", []),
+            }
+            logger.debug(f"Column '{column_name}' matched pattern '{pattern}'")
+            return matched_rule
+
+    # Fallback to defaults if no pattern matched (shouldn't happen with catch-all)
+    logger.warning(f"No pattern matched for column '{column_name}', using defaults")
+    return {
+        "pattern": "default",
+        "dtype": "auto",
+        "null_threshold": global_settings.get("default_null_threshold", 0.5),
+        "allow_column_deletion": global_settings.get("default_allow_column_deletion", True),
+        "imputation_strategy": global_settings.get("default_imputation_strategy", "auto"),
+        "imputation_value": None,
+        "validations": [],
+    }
+
+
+def apply_dtype_conversion(
+    df: pd.DataFrame, column: str, dtype: str
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """
+    Convert column to specified dtype.
+
+    Args:
+        df: DataFrame to modify
+        column: Column name
+        dtype: Target dtype (string, float, int, datetime, auto)
+
+    Returns:
+        Tuple of (modified df, conversion report)
+    """
+    report = {"column": column, "target_dtype": dtype, "status": "success"}
+
+    if dtype == "auto":
+        # Skip conversion, keep existing dtype
+        report["actual_dtype"] = str(df[column].dtype)
+        return df, report
+
+    try:
+        if dtype == "datetime":
+            df[column] = pd.to_datetime(df[column], errors="coerce", utc=True)
+        elif dtype == "float":
+            df[column] = pd.to_numeric(df[column], errors="coerce").astype(float)
+        elif dtype == "int":
+            # Convert to float first to handle NaN, then to nullable Int64
+            df[column] = pd.to_numeric(df[column], errors="coerce")
+        elif dtype == "string":
+            # Use pandas StringDtype to preserve null values (not convert NaN to "nan")
+            df[column] = df[column].astype("string")
+        else:
+            logger.warning(f"Unknown dtype '{dtype}' for column '{column}', skipping conversion")
+            report["status"] = "skipped"
+            report["reason"] = f"unknown dtype: {dtype}"
+
+        report["actual_dtype"] = str(df[column].dtype)
+    except Exception as e:
+        logger.error(f"Failed to convert column '{column}' to {dtype}: {e}")
+        report["status"] = "failed"
+        report["error"] = str(e)
+
+    return df, report
+
+
+def apply_column_validations(
+    df: pd.DataFrame, column: str, validations: list[str], report: dict[str, Any]
+) -> tuple[pd.DataFrame, int]:
+    """
+    Apply validation rules to a column and filter rows.
+
+    Args:
+        df: DataFrame to validate
+        column: Column name
+        validations: List of validation rule names
+        report: Report dictionary to update
+
+    Returns:
+        Tuple of (filtered df, number of rows dropped)
+    """
+    if not validations or column not in df.columns:
+        return df, 0
+
+    keep_mask = pd.Series([True] * len(df), index=df.index)
+    rows_before = len(df)
+
+    for validation in validations:
+        if validation == "positive":
+            keep_mask &= df[column] > 0
+        elif validation == "non_negative":
+            keep_mask &= df[column] >= 0
+        elif validation == "no_future_dates":
+            if pd.api.types.is_datetime64_any_dtype(df[column]):
+                now_utc = pd.Timestamp.now(tz="UTC")
+                keep_mask &= df[column] <= now_utc
+        else:
+            logger.warning(f"Unknown validation '{validation}' for column '{column}'")
+
+    df_filtered = df.loc[keep_mask].copy()
+    rows_dropped = rows_before - len(df_filtered)
+
+    if rows_dropped > 0:
+        if "validation_rows_dropped" not in report:
+            report["validation_rows_dropped"] = {}
+        report["validation_rows_dropped"][column] = {
+            "validations": validations,
+            "rows_dropped": int(rows_dropped),
+        }
+
+    return df_filtered, rows_dropped
+
+
+def impute_column_values(
+    df: pd.DataFrame, column: str, rule: dict[str, Any], null_count: int
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """
+    Impute missing values in a column based on strategy.
+
+    Args:
+        df: DataFrame to modify
+        column: Column name
+        rule: Column rule dictionary with imputation strategy
+        null_count: Number of null values
+
+    Returns:
+        Tuple of (modified df, imputation report)
+    """
+    imputation_info = {
+        "column": column,
+        "null_count": int(null_count),
+        "method": None,
+    }
+
+    strategy = rule.get("imputation_strategy", "auto")
+
+    # Handle "none" strategy - skip imputation entirely
+    if strategy == "none":
+        imputation_info["method"] = "none"
+        imputation_info["reason"] = "Imputation disabled by configuration"
+        return df, imputation_info
+
+    # Auto-detect strategy based on dtype
+    if strategy == "auto":
+        if pd.api.types.is_numeric_dtype(df[column]) and not pd.api.types.is_datetime64_any_dtype(df[column]):
+            strategy = "normal_distribution"
+        elif pd.api.types.is_datetime64_any_dtype(df[column]):
+            strategy = "unix_epoch"
+        else:
+            strategy = "constant"
+
+    try:
+        if strategy == "normal_distribution":
+            non_null_values = df[column].dropna()
+            if len(non_null_values) > 0:
+                mean_val = non_null_values.mean()
+                std_val = non_null_values.std()
+                if pd.isna(std_val) or std_val == 0:
+                    imputed_values = np.full(null_count, mean_val)
+                else:
+                    imputed_values = np.random.normal(mean_val, std_val, null_count)
+                df.loc[df[column].isna(), column] = imputed_values
+                imputation_info["method"] = "normal_distribution"
+                imputation_info["mean"] = float(mean_val)
+                imputation_info["std"] = float(std_val) if not pd.isna(std_val) else 0.0
+
+        elif strategy == "unix_epoch":
+            unix_epoch = pd.Timestamp(
+                "1970-01-01", tz=df[column].dt.tz if hasattr(df[column].dt, "tz") else None
+            )
+            df.loc[df[column].isna(), column] = unix_epoch
+            imputation_info["method"] = "unix_epoch"
+            imputation_info["value"] = str(unix_epoch)
+
+        elif strategy == "constant":
+            constant_val = rule.get("imputation_value")
+            if constant_val is None:
+                constant_val = "Unknown"
+            df.loc[df[column].isna(), column] = constant_val
+            imputation_info["method"] = "constant"
+            imputation_info["value"] = constant_val
+
+        else:
+            logger.warning(f"Unknown imputation strategy '{strategy}' for column '{column}'")
+            imputation_info["method"] = "skipped"
+            imputation_info["reason"] = f"unknown strategy: {strategy}"
+
+    except Exception as e:
+        logger.error(f"Imputation failed for column '{column}': {e}")
+        imputation_info["method"] = "failed"
+        imputation_info["error"] = str(e)
+
+    return df, imputation_info
+
+
+def clean_dataframe(
+    df: pd.DataFrame,
+    config_path: str | None = None,
+    global_threshold_override: float | None = None,
+) -> Tuple[pd.DataFrame, dict[str, Any]]:
+    """
+    Config-based flexible data cleaner that works with any data type.
+
+    Features:
+     - Pattern-based column rules from JSON configuration
+     - Per-column dtype conversion, null handling, and validation
+     - Configurable duplicate removal
+     - Relationship validations (optional, with graceful failures)
+     - Returns (clean_df, detailed_report)
 
     Args:
         df: Input DataFrame to clean
-        column_delete_threshold: Ratio threshold for column deletion (default 0.5).
-                                 Columns with null_ratio > threshold are deleted.
-                                 Columns with null_ratio <= threshold get imputed.
+        config_path: Path to cleaning config JSON. If None, uses default config.
+        global_threshold_override: Override global null threshold from config
+
+    Returns:
+        Tuple of (cleaned DataFrame, cleaning report dictionary)
     """
-    rep: Dict[str, Any] = {"clean": {}}
-    d = df.copy()
+    # Load configuration
+    config = load_cleaning_config(config_path)
+    global_settings = config.get("global_settings", {})
 
-    # Ensure required columns exist
-    missing = [c for c in REQUIRED_COLS if c not in d.columns]
-    if missing:
-        rep["clean"]["missing_required_columns"] = missing
+    # Override threshold if provided
+    if global_threshold_override is not None:
+        global_settings["default_null_threshold"] = global_threshold_override
 
-    # Parse/normalize types - only for columns that exist
-    if "ts" in d.columns:
-        d["ts"] = pd.to_datetime(d["ts"], errors="coerce", utc=True)
-
-    for c in ["open", "high", "low", "close", "volume"]:
-        if c in d.columns:
-            d[c] = pd.to_numeric(d[c], errors="coerce")
-
-    if "vwap" in d.columns:
-        d["vwap"] = pd.to_numeric(d["vwap"], errors="coerce")
-    if "transactions" in d.columns:
-        d["transactions"] = pd.to_numeric(d["transactions"], errors="coerce").astype(
-            "Int64"
-        )
-
-    # Drop exact duplicates only
-    before = len(d)
-    d = d.drop_duplicates(keep="first")
-    rep["clean"]["exact_duplicates_dropped"] = int(before - len(d))
-
-    # Handle null values based on column_delete_threshold
-    rep["clean"]["null_handling"] = {
-        "threshold": column_delete_threshold,
-        "columns_deleted": [],
-        "columns_imputed": {},
+    # Initialize report
+    rep: Dict[str, Any] = {
+        "clean": {
+            "config_version": config.get("version", 1),
+            "config_path": str(config_path) if config_path else "default",
+        }
     }
 
+    d = df.copy()
     total_rows = len(d)
+
+    # 1. Duplicate Removal (optional)
+    if global_settings.get("remove_duplicates", False):
+        before = len(d)
+        d = d.drop_duplicates(keep="first")
+        duplicates_dropped = before - len(d)
+        rep["clean"]["exact_duplicates_dropped"] = int(duplicates_dropped)
+        logger.debug(f"Dropped {duplicates_dropped} exact duplicate rows")
+    else:
+        rep["clean"]["exact_duplicates_dropped"] = 0
+
+    # 2. Per-Column Processing
+    rep["clean"]["column_processing"] = {}
+    rep["clean"]["dtype_conversions"] = []
+    rep["clean"]["null_handling"] = {"columns_deleted": [], "columns_imputed": {}}
+
     columns_to_delete = []
 
     for col in d.columns:
+        # Match column rule
+        rule = match_column_rule(col, config)
+
+        col_report = {
+            "column": col,
+            "matched_pattern": rule["pattern"],
+            "target_dtype": rule["dtype"],
+        }
+
+        # 2a. Dtype Conversion
+        d, dtype_report = apply_dtype_conversion(d, col, rule["dtype"])
+        rep["clean"]["dtype_conversions"].append(dtype_report)
+
+        # 2b. Null Handling
         null_count = d[col].isna().sum()
         null_ratio = null_count / total_rows if total_rows > 0 else 0
 
-        if null_ratio > column_delete_threshold:
-            # Delete column if null ratio exceeds threshold
+        col_report["null_count"] = int(null_count)
+        col_report["null_ratio"] = float(null_ratio)
+
+        threshold = rule["null_threshold"]
+        allow_deletion = rule["allow_column_deletion"]
+
+        if null_ratio > threshold and allow_deletion:
+            # Mark for deletion
             columns_to_delete.append(col)
             rep["clean"]["null_handling"]["columns_deleted"].append(
                 {
                     "column": col,
                     "null_ratio": float(null_ratio),
                     "null_count": int(null_count),
+                    "threshold": float(threshold),
                 }
             )
+            col_report["action"] = "deleted"
+
         elif null_count > 0:
-            # Impute missing values if null ratio is within threshold
-            imputation_info = {
-                "null_count": int(null_count),
-                "null_ratio": float(null_ratio),
-                "method": None,
-            }
-
-            # Determine column type and impute accordingly
-            if pd.api.types.is_numeric_dtype(
-                d[col]
-            ) and not pd.api.types.is_datetime64_any_dtype(d[col]):
-                # Numerical column: use normal distribution
-                non_null_values = d[col].dropna()
-                if len(non_null_values) > 0:
-                    mean_val = non_null_values.mean()
-                    std_val = non_null_values.std()
-                    if pd.isna(std_val) or std_val == 0:
-                        # If std is 0 or NaN, just use the mean
-                        imputed_values = np.full(null_count, mean_val)
-                    else:
-                        # Sample from normal distribution
-                        imputed_values = np.random.normal(mean_val, std_val, null_count)
-                    d.loc[d[col].isna(), col] = imputed_values
-                    imputation_info["method"] = "normal_distribution"
-                    imputation_info["mean"] = float(mean_val)
-                    imputation_info["std"] = (
-                        float(std_val) if not pd.isna(std_val) else 0.0
-                    )
-
-            elif pd.api.types.is_datetime64_any_dtype(d[col]):
-                # Datetime column: use Unix epoch
-                unix_epoch = pd.Timestamp(
-                    "1970-01-01", tz=d[col].dt.tz if hasattr(d[col].dt, "tz") else None
-                )
-                d.loc[d[col].isna(), col] = unix_epoch
-                imputation_info["method"] = "unix_epoch"
-                imputation_info["value"] = str(unix_epoch)
-
-            else:
-                # Categorical/string column: use constant "Unknown"
-                d.loc[d[col].isna(), col] = "Unknown"
-                imputation_info["method"] = "constant"
-                imputation_info["value"] = "Unknown"
-
+            # Impute missing values
+            d, imputation_info = impute_column_values(d, col, rule, null_count)
+            imputation_info["null_ratio"] = float(null_ratio)
+            imputation_info["threshold"] = float(threshold)
             rep["clean"]["null_handling"]["columns_imputed"][col] = imputation_info
+            col_report["action"] = "imputed"
+        else:
+            col_report["action"] = "none_needed"
 
-    # Delete columns that exceed threshold
+        # 2c. Column Validations (filters rows)
+        validations = rule.get("validations", [])
+        if validations:
+            d, rows_dropped = apply_column_validations(d, col, validations, rep["clean"])
+            if rows_dropped > 0:
+                col_report["validation_rows_dropped"] = rows_dropped
+
+        rep["clean"]["column_processing"][col] = col_report
+
+    # Delete columns marked for deletion
     if columns_to_delete:
         d = d.drop(columns=columns_to_delete)
         rep["clean"]["null_handling"]["total_columns_deleted"] = len(columns_to_delete)
+        logger.debug(f"Deleted {len(columns_to_delete)} columns due to null ratio")
 
-    # Hard filters (note: nulls are already handled above via imputation/column deletion)
-    # Only check columns that still exist after potential column deletions
-    existing_required = [c for c in REQUIRED_COLS if c in d.columns]
-    deleted_required = [c for c in REQUIRED_COLS if c in columns_to_delete]
+    # 3. Final dtype adjustments for integer columns
+    for col in d.columns:
+        rule = match_column_rule(col, config)
+        if rule["dtype"] == "int" and col in d.columns:
+            # Convert to nullable Int64
+            d[col] = d[col].round().astype("Int64")
 
-    if deleted_required:
-        # Warn if any required columns were deleted
-        if "warnings" not in rep["clean"]:
-            rep["clean"]["warnings"] = {}
-        rep["clean"]["warnings"]["deleted_required_columns"] = (
-            f"Some columns labeled as required were deleted due to high null ratio: {deleted_required}"
-        )
+    # 4. Relationship Validations (optional cross-column checks)
+    d, rel_validation_report = validate_relationships(d, config)
+    if rel_validation_report:
+        rep["clean"]["relationship_validations"] = rel_validation_report
 
-    # Build keep_mask based on which columns still exist
-    keep_mask = pd.Series([True] * len(d), index=d.index)
-
-    if "ts" in d.columns:
-        now_utc = pd.Timestamp.now(tz="UTC")
-        keep_mask &= d["ts"] <= now_utc
-
-    if "open" in d.columns:
-        keep_mask &= d["open"] > 0
-
-    if "high" in d.columns:
-        keep_mask &= d["high"] > 0
-
-    if "low" in d.columns:
-        keep_mask &= d["low"] > 0
-
-    if "close" in d.columns:
-        keep_mask &= d["close"] > 0
-
-    if "volume" in d.columns:
-        keep_mask &= d["volume"] >= 0
-
-    # Check high/low relationships if all relevant columns exist
-    if all(c in d.columns for c in ["open", "close", "high", "low"]):
-        oc_max = d[["open", "close"]].max(axis=1)
-        oc_min = d[["open", "close"]].min(axis=1)
-        keep_mask &= (d["high"] >= oc_max) & (d["low"] <= oc_min)
-
-    rep["clean"]["hard_rows_dropped"] = int((~keep_mask).sum())
-    d = d.loc[keep_mask].copy()
-
-    # Soft fixes
-    if "vwap" in d.columns and "low" in d.columns and "high" in d.columns:
-        bad_vwap = (~d["vwap"].isna()) & (
-            (d["vwap"] < d["low"]) | (d["vwap"] > d["high"])
-        )
-        rep["clean"]["vwap_set_null"] = int(bad_vwap.sum())
-        d.loc[bad_vwap, "vwap"] = np.nan
-
-    if "transactions" in d.columns:
-        bad_tx = d["transactions"].notna() & (d["transactions"] < 0)
-        rep["clean"]["transactions_set_null"] = int(bad_tx.sum())
-        d.loc[bad_tx, "transactions"] = pd.NA
-
-    # Ensure volume column uses integer dtype for downstream schema validation
-    if "volume" in d.columns:
-        d["volume"] = d["volume"].round().astype("Int64")
-
-    if "transactions" in d.columns:
-        d["transactions"] = d["transactions"].astype("Int64")
-
-    # Optional tidy & dtype align - only sort by columns that exist
+    # 5. Sort and tidy
     sort_cols = [c for c in ["ticker", "ts"] if c in d.columns]
     if sort_cols:
         d = d.sort_values(sort_cols, kind="stable").reset_index(drop=True)
     else:
         d = d.reset_index(drop=True)
 
+    rep["clean"]["final_rows"] = len(d)
+    rep["clean"]["final_columns"] = list(d.columns)
+
     return d, rep
 
 
-def get_default_schema_config() -> Dict[str, Any]:
-    """Returns the default validation schema configuration for stock bars."""
+def validate_relationships(
+    df: pd.DataFrame, config: Dict[str, Any]
+) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    """
+    Apply relationship validations defined in config.
 
-    # Vectorized checks for better performance
-    is_tz_aware = Check(
-        lambda s: pd.api.types.is_datetime64_any_dtype(s) and s.dt.tz is not None,
-        element_wise=False,
-        error="ts must be a timezone-aware Series.",
-    )
-    is_utc = Check(
-        lambda s: str(s.dt.tz) in ("UTC", "utc"),
-        element_wise=False,
-        error="ts must be UTC.",
-    )
-    is_not_future = Check(
-        lambda s: (s <= pd.Timestamp.now(tz="UTC")).all(),
-        element_wise=False,
-        error="Found future timestamps.",
-    )
+    Args:
+        df: DataFrame to validate
+        config: Configuration dictionary
 
-    schema_config = {
-        "columns": {
-            "ticker": Column(pa.String, checks=Check.str_length(min_value=1)),
-            # THIS IS THE FIX: Directly specify the pandas dtype string for a timezone-aware column.
-            "ts": Column(
-                dtype="datetime64[ns, UTC]", checks=[is_tz_aware, is_utc, is_not_future]
-            ),
-            "open": Column(
-                pa.Float, checks=[Check.gt(0), Check(lambda s: np.isfinite(s))]
-            ),
-            "high": Column(
-                pa.Float, checks=[Check.gt(0), Check(lambda s: np.isfinite(s))]
-            ),
-            "low": Column(
-                pa.Float, checks=[Check.gt(0), Check(lambda s: np.isfinite(s))]
-            ),
-            "close": Column(
-                pa.Float, checks=[Check.gt(0), Check(lambda s: np.isfinite(s))]
-            ),
-            "volume": Column(pa.Int, checks=Check.ge(0)),
-            "vwap": Column(pa.Float, nullable=True, required=False),
-            "transactions": Column(
-                pa.Int, nullable=True, checks=Check.ge(0), required=False
-            ),
-        },
-        "dataframe_checks": [
-            Check(
-                lambda df: (df["high"] >= df[["open", "close"]].max(axis=1)).all(),
-                error="high < max(open, close).",
-            ),
-            Check(
-                lambda df: (df["low"] <= df[["open", "close"]].min(axis=1)).all(),
-                error="low > min(open, close).",
-            ),
-            Check(
-                lambda df: ("vwap" not in df.columns)
-                or (
-                    (df["vwap"].isna())
-                    | ((df["vwap"] >= df["low"]) & (df["vwap"] <= df["high"]))
-                ).all(),
-                error="vwap must be within [low, high] when present.",
-            ),
-        ],
-    }
-    return schema_config
+    Returns:
+        Tuple of (modified df, validation report)
+    """
+    report = {}
+    rel_validations = config.get("relationship_validations", [])
 
+    for validation in rel_validations:
+        name = validation.get("name", "unnamed")
+        required_cols = validation.get("required_columns", [])
+        check_type = validation.get("check_type", "")
+        action_on_failure = validation.get("action_on_failure", "drop_rows")
 
-def pandera_validate_safely(
-    df: pd.DataFrame, schema_config: Dict[str, Any] = None
-) -> Dict[str, Any]:
-    """Validate using a flexible schema. Never raises."""
-    info: Dict[str, Any] = {"pandera": {"enabled": False, "status": "skipped"}}
-
-    if schema_config is None:
-        schema_config = get_default_schema_config()
-
-    columns_to_validate = {
-        col_name: col_schema
-        for col_name, col_schema in schema_config["columns"].items()
-        if col_name in df.columns
-    }
-
-    schema = pa.DataFrameSchema(
-        columns=columns_to_validate,
-        checks=schema_config.get("dataframe_checks", []),
-        coerce=False,
-        strict=False,
-        unique=None,
-    )
-
-    _v = df.copy()
-
-    try:
-        schema.validate(_v, lazy=True)
-        info["pandera"] = {"enabled": True, "status": "passed"}
-    except Exception as e:
-        info["pandera"] = {
-            "enabled": True,
-            "status": f"failed: {type(e).__name__}",
-            "details": str(e),
+        val_report = {
+            "name": name,
+            "description": validation.get("description", ""),
+            "required_columns": required_cols,
+            "status": "skipped",
         }
-    return info
+
+        # Check if all required columns exist
+        missing_cols = [c for c in required_cols if c not in df.columns]
+        if missing_cols:
+            val_report["status"] = "skipped"
+            val_report["reason"] = f"Missing columns: {missing_cols}"
+            val_report["level"] = "warning"
+            logger.warning(f"Relationship validation '{name}' skipped: missing {missing_cols}")
+            report[name] = val_report
+            continue
+
+        # Apply the check
+        try:
+            if check_type == "high_low_relationship":
+                # Stock-specific: high >= max(open,close), low <= min(open,close)
+                oc_max = df[["open", "close"]].max(axis=1)
+                oc_min = df[["open", "close"]].min(axis=1)
+                valid_mask = (df["high"] >= oc_max) & (df["low"] <= oc_min)
+                failed_rows = (~valid_mask).sum()
+
+                if failed_rows > 0:
+                    val_report["status"] = "failed"
+                    val_report["failed_rows"] = int(failed_rows)
+                    val_report["level"] = "error"
+                    logger.error(f"Relationship validation '{name}' failed for {failed_rows} rows")
+
+                    if action_on_failure == "drop_rows":
+                        df = df.loc[valid_mask].copy()
+                        val_report["action_taken"] = "dropped_rows"
+                else:
+                    val_report["status"] = "passed"
+
+            elif check_type == "vwap_in_range":
+                # VWAP should be within [low, high]
+                vwap_col = "vwap"
+                if vwap_col in df.columns:
+                    bad_vwap = (~df[vwap_col].isna()) & (
+                        (df[vwap_col] < df["low"]) | (df[vwap_col] > df["high"])
+                    )
+                    failed_count = bad_vwap.sum()
+
+                    if failed_count > 0:
+                        val_report["status"] = "failed"
+                        val_report["failed_rows"] = int(failed_count)
+                        val_report["level"] = "error"
+                        logger.error(f"Relationship validation '{name}' failed for {failed_count} rows")
+
+                        if action_on_failure == "set_null":
+                            df.loc[bad_vwap, vwap_col] = np.nan
+                            val_report["action_taken"] = "set_to_null"
+                    else:
+                        val_report["status"] = "passed"
+
+            else:
+                val_report["status"] = "skipped"
+                val_report["reason"] = f"Unknown check type: {check_type}"
+                logger.warning(f"Unknown relationship check type '{check_type}' for validation '{name}'")
+
+        except Exception as e:
+            val_report["status"] = "error"
+            val_report["error"] = str(e)
+            val_report["level"] = "error"
+            logger.error(f"Relationship validation '{name}' encountered error: {e}")
+
+        report[name] = val_report
+
+    return df, report
+
+
+def clean_stock_bars(
+    df: pd.DataFrame, column_delete_threshold: float = 0.5
+) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    """
+    Backward-compatible wrapper around clean_dataframe for stock data.
+
+    This function maintains the original API for legacy code while using
+    the new config-based cleaning system.
+
+    Args:
+        df: Input DataFrame to clean
+        column_delete_threshold: Ratio threshold for column deletion (default 0.5)
+
+    Returns:
+        Tuple of (cleaned DataFrame, cleaning report)
+    """
+    logger.debug("clean_stock_bars called, delegating to clean_dataframe with config")
+    return clean_dataframe(
+        df, config_path=None, global_threshold_override=column_delete_threshold
+    )
 
 
 def pipeline_clean(
@@ -355,21 +597,13 @@ def pipeline_clean(
         df = data.copy()
         report["read"] = {"path": None, "rows": len(df), "columns": list(df.columns)}
 
-    # Clean data
-    logger.debug("data_cleaning: calling clean_stock_bars")
+    # Clean data using config-based system
+    logger.debug("data_cleaning: calling clean_dataframe via clean_stock_bars wrapper")
     cleaned, clean_rep = clean_stock_bars(df, column_delete_threshold)
     logger.debug(
-        f"data_cleaning: finished clean_stock_bars. resulting report {clean_rep}. dataframe cleaned {cleaned}."
+        f"data_cleaning: finished cleaning. resulting report {clean_rep}. dataframe cleaned {cleaned}."
     )
     report.update(clean_rep)
-
-    # Validate with Pandera
-    logger.debug("data_cleaning: calling pandera_validate_safely")
-    pandera_rep = pandera_validate_safely(cleaned)
-    logger.debug(
-        f"data_cleaning: finished pandera_validate_safely. resulting report {pandera_rep}. dataframe cleaned {cleaned}."
-    )
-    report.update(pandera_rep)
 
     # Log the final report for easy viewing
     # logger.info(f"Pipeline Report: {report}")

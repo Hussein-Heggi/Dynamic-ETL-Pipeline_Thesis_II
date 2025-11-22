@@ -1,0 +1,199 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://example.com/cleaning_config.schema.json",
+	"title": "Data Cleaning Configuration",
+	"description": "Configuration schema for pattern-based data cleaning with per-column policies",
+	"type": "object",
+	"required": [
+		"version",
+		"global_settings",
+		"column_rules"
+	],
+	"properties": {
+		"$schema": {
+			"type": "string",
+			"description": "JSON Schema reference"
+		},
+		"version": {
+			"type": "integer",
+			"description": "Configuration version number",
+			"minimum": 1
+		},
+		"description": {
+			"type": "string",
+			"description": "Optional description of this configuration"
+		},
+		"global_settings": {
+			"type": "object",
+			"description": "Default settings applied when not overridden in column rules",
+			"properties": {
+				"default_null_threshold": {
+					"type": "number",
+					"description": "Default ratio (0.0-1.0) of null values that triggers column deletion",
+					"minimum": 0.0,
+					"maximum": 1.0,
+					"default": 0.5
+				},
+				"default_allow_column_deletion": {
+					"type": "boolean",
+					"description": "Default policy for whether columns can be deleted due to high null ratio",
+					"default": true
+				},
+				"default_imputation_strategy": {
+					"type": "string",
+					"description": "Default imputation strategy for missing values",
+					"enum": [
+						"auto",
+						"normal_distribution",
+						"unix_epoch",
+						"constant",
+						"none"
+					],
+					"default": "auto"
+				},
+				"remove_duplicates": {
+					"type": "boolean",
+					"description": "Whether to remove exact duplicate rows",
+					"default": false
+				}
+			},
+			"required": [
+				"default_null_threshold",
+				"default_allow_column_deletion",
+				"default_imputation_strategy",
+				"remove_duplicates"
+			]
+		},
+		"column_rules": {
+			"type": "array",
+			"description": "Ordered list of column rules. First matching pattern wins.",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": [
+					"pattern"
+				],
+				"properties": {
+					"comment": {
+						"type": "string",
+						"description": "Optional comment describing this rule"
+					},
+					"pattern": {
+						"type": "string",
+						"description": "Regex pattern to match column names (e.g., '^ticker$', '^balance_sheet_.*')",
+						"minLength": 1
+					},
+					"dtype": {
+						"type": "string",
+						"description": "Target data type for the column",
+						"enum": [
+							"auto",
+							"string",
+							"float",
+							"int",
+							"datetime"
+						],
+						"default": "auto"
+					},
+					"null_threshold": {
+						"type": "number",
+						"description": "Ratio (0.0-1.0) of null values above which column is deleted (if deletion allowed). Optional, uses global default if not specified.",
+						"minimum": 0.0,
+						"maximum": 1.0
+					},
+					"allow_column_deletion": {
+						"type": "boolean",
+						"description": "Whether this column can be deleted if null_threshold is exceeded. Optional, uses global default if not specified."
+					},
+					"imputation_strategy": {
+						"type": "string",
+						"description": "Strategy for imputing missing values. 'none' = skip imputation entirely (leave nulls as-is)",
+						"enum": [
+							"auto",
+							"normal_distribution",
+							"unix_epoch",
+							"constant",
+							"none"
+						]
+					},
+					"imputation_value": {
+						"description": "Value to use for 'constant' imputation strategy. Can be string, number, or null.",
+						"oneOf": [
+							{
+								"type": "string"
+							},
+							{
+								"type": "number"
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"validations": {
+						"type": "array",
+						"description": "List of validation rules to apply (filters rows that don't meet criteria)",
+						"items": {
+							"type": "string",
+							"enum": [
+								"positive",
+								"non_negative",
+								"no_future_dates"
+							]
+						},
+						"default": []
+					}
+				}
+			}
+		},
+		"relationship_validations": {
+			"type": "array",
+			"description": "Optional cross-column validation rules",
+			"items": {
+				"type": "object",
+				"required": [
+					"name",
+					"required_columns",
+					"check_type"
+				],
+				"properties": {
+					"name": {
+						"type": "string",
+						"description": "Unique name for this validation",
+						"minLength": 1
+					},
+					"description": {
+						"type": "string",
+						"description": "Human-readable description of what this validation checks"
+					},
+					"required_columns": {
+						"type": "array",
+						"description": "List of columns required for this validation",
+						"minItems": 1,
+						"items": {
+							"type": "string"
+						}
+					},
+					"check_type": {
+						"type": "string",
+						"description": "Type of relationship check to perform",
+						"enum": [
+							"high_low_relationship",
+							"vwap_in_range"
+						]
+					},
+					"action_on_failure": {
+						"type": "string",
+						"description": "Action to take when validation fails",
+						"enum": [
+							"drop_rows",
+							"set_null"
+						],
+						"default": "drop_rows"
+					}
+				}
+			},
+			"default": []
+		}
+	}
+}
