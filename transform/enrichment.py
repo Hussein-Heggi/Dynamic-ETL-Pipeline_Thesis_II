@@ -467,59 +467,78 @@ def apply_features(df: pd.DataFrame, dsl: dict, registry: dict) -> pd.DataFrame:
 
     all_new_cols = []
 
-    for request in dsl.get("features", []):
+    for idx, request in enumerate(dsl.get("features", [])):
         name: str = request["name"]
         final_params = request.get("params", {})
 
-        # Check if this is a custom feature
-        if name.startswith("custom_"):
-            # Execute custom code for each group
-            code = final_params["code"]
-            output_col_name = final_params["as"]
+        logger.debug(f"Processing feature {idx+1}/{len(dsl.get('features', []))}: '{name}' with params: {final_params}")
 
-            # TODO: check if we should groupby ticker
-            if has_ticker:
-                result_list = [
-                    _execute_custom_code(code, group_df)
-                    for _, group_df in df_enriched.groupby("ticker")
-                ]
-                full_result = pd.concat(result_list)
-            else:
-                # Apply to entire DataFrame if no ticker column
-                full_result = _execute_custom_code(code, df_enriched)
+        try:
+            # Check if this is a custom feature
+            if name.startswith("custom_"):
+                # Execute custom code for each group
+                code = final_params["code"]
+                output_col_name = final_params["as"]
 
-            all_new_cols.append(full_result.rename(output_col_name))
-        else:
-            # Use standard feature implementation
-            impl_func = FEATURE_IMPLEMENTATIONS.get(name)
+                logger.debug(f"Executing custom feature '{name}' with code:\n{code}")
 
-            # Direct Calculation per Group (or entire DataFrame if no ticker)
-            # TODO: check if we should groupby ticker
-            if has_ticker:
-                result_list = [
-                    impl_func(group_df, **final_params)
-                    for _, group_df in df_enriched.groupby("ticker")
-                ]
-                full_result = pd.concat(result_list)
-            else:
-                # Apply to entire DataFrame if no ticker column
-                full_result = impl_func(df_enriched, **final_params)
+                # TODO: check if we should groupby ticker
+                if has_ticker:
+                    result_list = [
+                        _execute_custom_code(code, group_df)
+                        for _, group_df in df_enriched.groupby("ticker")
+                    ]
+                    full_result = pd.concat(result_list)
+                else:
+                    # Apply to entire DataFrame if no ticker column
+                    full_result = _execute_custom_code(code, df_enriched)
 
-            # Assign Results
-            if isinstance(full_result, pd.DataFrame):
-                for col in full_result.columns:
-                    output_col_name = f"{name}_{col}"
-                    all_new_cols.append(
-                        full_result[[col]].rename(columns={col: output_col_name})
-                    )
-            else:
-                output_col_name = request.get(
-                    "as",
-                    f"{name}_{final_params.get('on', '')}_{final_params.get('window', '')}".rstrip(
-                        "_"
-                    ),
-                )
                 all_new_cols.append(full_result.rename(output_col_name))
+                logger.debug(f"Successfully applied custom feature '{name}' -> column '{output_col_name}'")
+            else:
+                # Use standard feature implementation
+                impl_func = FEATURE_IMPLEMENTATIONS.get(name)
+
+                if impl_func is None:
+                    logger.error(f"Feature '{name}' not found in FEATURE_IMPLEMENTATIONS")
+                    raise ValueError(f"Unknown feature: {name}")
+
+                # Direct Calculation per Group (or entire DataFrame if no ticker)
+                # TODO: check if we should groupby ticker
+                if has_ticker:
+                    result_list = [
+                        impl_func(group_df, **final_params)
+                        for _, group_df in df_enriched.groupby("ticker")
+                    ]
+                    full_result = pd.concat(result_list)
+                else:
+                    # Apply to entire DataFrame if no ticker column
+                    full_result = impl_func(df_enriched, **final_params)
+
+                # Assign Results
+                if isinstance(full_result, pd.DataFrame):
+                    for col in full_result.columns:
+                        output_col_name = f"{name}_{col}"
+                        all_new_cols.append(
+                            full_result[[col]].rename(columns={col: output_col_name})
+                        )
+                        logger.debug(f"Applied feature '{name}' -> column '{output_col_name}'")
+                else:
+                    output_col_name = request.get(
+                        "as",
+                        f"{name}_{final_params.get('on', '')}_{final_params.get('window', '')}".rstrip(
+                            "_"
+                        ),
+                    )
+                    all_new_cols.append(full_result.rename(output_col_name))
+                    logger.debug(f"Applied feature '{name}' -> column '{output_col_name}'")
+
+        except Exception as e:
+            logger.exception(f"Failed to apply feature '{name}' (feature {idx+1}/{len(dsl.get('features', []))})")
+            logger.error(f"Feature params: {final_params}")
+            logger.error(f"Available DataFrame columns: {list(df_enriched.columns)}")
+            logger.error(f"Feature request: {request}")
+            raise  # Re-raise to be caught by outer try-except
 
     # Combine original df with all new feature columns at once
     if all_new_cols:
@@ -570,8 +589,14 @@ def enrich_dataframe_from_keywords(
         user_keywords, allowed_features_prompt, available_columns
     )
 
+    # Log the LLM response for debugging
+    logger.info(f"LLM returned DSL recipe: {dsl_string}")
+
     # Validate and enrich DSL with defaults
     dsl, errors = validate_dsl(dsl_string, registry)
+
+    # Log the validated DSL
+    logger.debug(f"Validated DSL: {dsl}")
 
     metadata = {
         "dsl_string": dsl_string,
@@ -588,12 +613,16 @@ def enrich_dataframe_from_keywords(
 
     # Apply features
     try:
+        logger.debug(f"Applying {len(dsl.get('features', []))} features to DataFrame")
         df_enriched = apply_features(df, dsl, registry)
         metadata["success"] = True
+        logger.info(f"Successfully applied all features. New columns: {set(df_enriched.columns) - set(df.columns)}")
         return df_enriched, metadata
     except Exception as e:
         metadata["errors"].append(f"Feature application error: {str(e)}")
-        logger.error(f"Feature application failed: {e}")
+        logger.exception(f"Feature application failed with exception: {e}")
+        logger.error(f"Failed while processing DSL: {dsl}")
+        logger.error(f"Available DataFrame columns: {list(df.columns)}")
         return df, metadata
 
 
