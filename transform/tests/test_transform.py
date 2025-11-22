@@ -13,9 +13,9 @@ import numpy as np
 import pandas as pd
 
 # Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from transform import transform_pipeline, transform_single, transform_pipeline_from_list
+from transform.transform import transform_pipeline, transform_single, transform_pipeline_from_list
 
 
 def print_separator(title):
