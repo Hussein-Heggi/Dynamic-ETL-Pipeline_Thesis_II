@@ -1,3 +1,4 @@
+import os
 from typing import cast
 
 from openai import OpenAI
@@ -10,6 +11,12 @@ client = OpenAI(api_key=HARDCODED_OPENAI_KEY)
 
 model = HARDCODED_OPENAI_MODEL
 
+if os.getenv("OPENAI_API_KEY"):
+    client.api_key = os.getenv("OPENAI_API_KEY", HARDCODED_OPENAI_KEY)
+if os.getenv('OPENAI_API_BASE_URL'):
+    client.base_url = os.getenv('OPENAI_API_BASE_URL', 'https://api.openai.com/v1')
+if os.getenv('OPENAI_API_MODEL'):
+    model = os.getenv('OPENAI_API_MODEL', model)
 
 def get_llm_recipe(
     user_keywords: list[str],
