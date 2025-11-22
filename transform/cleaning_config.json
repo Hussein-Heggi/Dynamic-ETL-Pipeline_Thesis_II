@@ -1,0 +1,126 @@
+{
+	"$schema": "./cleaning_config.schema.json",
+	"version": 1,
+	"description": "Data cleaning configuration with pattern-based column rules",
+	"global_settings": {
+		"default_null_threshold": 0.5,
+		"default_allow_column_deletion": true,
+		"default_imputation_strategy": "auto",
+		"remove_duplicates": false
+	},
+	"column_rules": [
+		{
+			"comment": "Ticker column - required, no deletion allowed",
+			"pattern": "^ticker$",
+			"dtype": "string",
+			"allow_column_deletion": false,
+			"imputation_strategy": "constant",
+			"imputation_value": "UNKNOWN"
+		},
+		{
+			"comment": "Timestamp column - required, no deletion allowed, no future dates",
+			"pattern": "^(ts|timestamp)$",
+			"dtype": "datetime",
+			"allow_column_deletion": false,
+			"imputation_strategy": "unix_epoch",
+			"validations": [
+				"no_future_dates"
+			]
+		},
+		{
+			"comment": "Stock OHLC columns - must be positive",
+			"pattern": "^(open|high|low|close)$",
+			"dtype": "float",
+			"validations": [
+				"positive"
+			],
+			"imputation_strategy": "normal_distribution"
+		},
+		{
+			"comment": "Stock volume - must be non-negative, converted to integer",
+			"pattern": "^volume$",
+			"dtype": "int",
+			"validations": [
+				"non_negative"
+			],
+			"imputation_strategy": "normal_distribution"
+		},
+		{
+			"comment": "VWAP - optional stock column with higher null tolerance",
+			"pattern": "^vwap$",
+			"dtype": "float",
+			"validations": [],
+			"imputation_strategy": "normal_distribution"
+		},
+		{
+			"comment": "Transactions - optional stock column, integer, non-negative",
+			"pattern": "^transactions$",
+			"dtype": "int",
+			"validations": [
+				"non_negative"
+			],
+			"imputation_strategy": "normal_distribution"
+		},
+		{
+			"comment": "Balance sheet columns - high null tolerance for financial data",
+			"pattern": "^balance_sheet_.*",
+			"dtype": "auto",
+			"imputation_strategy": "auto",
+			"validations": []
+		},
+		{
+			"comment": "Cash flow columns - high null tolerance",
+			"pattern": "^cash_flow_.*",
+			"dtype": "auto",
+			"imputation_strategy": "auto",
+			"validations": []
+		},
+		{
+			"comment": "Income statement columns - high null tolerance",
+			"pattern": "^income_statement_.*",
+			"dtype": "auto",
+			"imputation_strategy": "auto",
+			"validations": []
+		},
+		{
+			"comment": "Earnings columns - moderate null tolerance",
+			"pattern": "^earnings_.*",
+			"dtype": "auto",
+			"imputation_strategy": "auto",
+			"validations": []
+		},
+		{
+			"comment": "Catch-all for any unmatched columns - auto-detect dtype and use defaults",
+			"pattern": ".*",
+			"dtype": "auto",
+			"imputation_strategy": "auto",
+			"allow_column_deletion": true,
+			"validations": []
+		}
+	],
+	"relationship_validations": [
+		{
+			"name": "stock_high_low_check",
+			"description": "Validates that high >= max(open, close) and low <= min(open, close)",
+			"required_columns": [
+				"high",
+				"low",
+				"open",
+				"close"
+			],
+			"check_type": "high_low_relationship",
+			"action_on_failure": "drop_rows"
+		},
+		{
+			"name": "vwap_bounds_check",
+			"description": "Validates that vwap is within [low, high] range",
+			"required_columns": [
+				"vwap",
+				"low",
+				"high"
+			],
+			"check_type": "vwap_in_range",
+			"action_on_failure": "set_null"
+		}
+	]
+}

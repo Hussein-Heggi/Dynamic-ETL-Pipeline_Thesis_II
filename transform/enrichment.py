@@ -219,8 +219,176 @@ def feat_session_flags(g: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+# --- 3. Generic Helper Functions (Work on Any Column) ---
+def feat_yoy_growth(g: pd.DataFrame, on: str, periods: int = 4) -> pd.Series:
+    """Year-over-year growth (default periods=4 for quarterly data)"""
+    return g[on].pct_change(periods)
+
+
+def feat_qoq_growth(g: pd.DataFrame, on: str) -> pd.Series:
+    """Quarter-over-quarter growth"""
+    return g[on].pct_change(1)
+
+
+def feat_rolling_avg(g: pd.DataFrame, on: str, window: int) -> pd.Series:
+    """Rolling average over N periods"""
+    return g[on].rolling(window, min_periods=1).mean()
+
+
+def feat_pct_change(g: pd.DataFrame, on: str, periods: int) -> pd.Series:
+    """Percentage change over N periods"""
+    return g[on].pct_change(periods)
+
+
+# --- 4. Balance Sheet Enrichments ---
+def feat_current_ratio(g: pd.DataFrame) -> pd.Series:
+    """Current Ratio = Current Assets / Current Liabilities"""
+    return g["balance_sheet_totalCurrentAssets"] / g[
+        "balance_sheet_totalCurrentLiabilities"
+    ].replace(0, np.nan)
+
+
+def feat_quick_ratio(g: pd.DataFrame) -> pd.Series:
+    """Quick Ratio = (Current Assets - Inventory) / Current Liabilities"""
+    return (
+        g["balance_sheet_totalCurrentAssets"] - g["balance_sheet_inventory"]
+    ) / g["balance_sheet_totalCurrentLiabilities"].replace(0, np.nan)
+
+
+def feat_debt_to_equity(g: pd.DataFrame) -> pd.Series:
+    """Debt-to-Equity Ratio = Total Debt / Total Shareholder Equity"""
+    total_debt = g["balance_sheet_longTermDebt"].fillna(0) + g[
+        "balance_sheet_shortTermDebt"
+    ].fillna(0)
+    return total_debt / g["balance_sheet_totalShareholderEquity"].replace(0, np.nan)
+
+
+def feat_debt_to_assets(g: pd.DataFrame) -> pd.Series:
+    """Debt-to-Assets Ratio = Total Debt / Total Assets"""
+    total_debt = g["balance_sheet_longTermDebt"].fillna(0) + g[
+        "balance_sheet_shortTermDebt"
+    ].fillna(0)
+    return total_debt / g["balance_sheet_totalAssets"].replace(0, np.nan)
+
+
+def feat_working_capital(g: pd.DataFrame) -> pd.Series:
+    """Working Capital = Current Assets - Current Liabilities"""
+    return (
+        g["balance_sheet_totalCurrentAssets"]
+        - g["balance_sheet_totalCurrentLiabilities"]
+    )
+
+
+def feat_equity_ratio(g: pd.DataFrame) -> pd.Series:
+    """Equity Ratio = Total Shareholder Equity / Total Assets"""
+    return g["balance_sheet_totalShareholderEquity"] / g[
+        "balance_sheet_totalAssets"
+    ].replace(0, np.nan)
+
+
+# --- 5. Cash Flow Enrichments ---
+def feat_free_cash_flow(g: pd.DataFrame) -> pd.Series:
+    """Free Cash Flow = Operating Cash Flow - Capital Expenditures"""
+    return g["cash_flow_operatingCashflow"] - g["cash_flow_capitalExpenditures"].fillna(
+        0
+    )
+
+
+def feat_operating_cash_margin(g: pd.DataFrame) -> pd.Series:
+    """Operating Cash Margin = Operating Cash Flow / Net Income"""
+    return g["cash_flow_operatingCashflow"] / g["cash_flow_netIncome"].replace(
+        0, np.nan
+    )
+
+
+def feat_capex_intensity(g: pd.DataFrame) -> pd.Series:
+    """CapEx Intensity = Capital Expenditures / Operating Cash Flow"""
+    return g["cash_flow_capitalExpenditures"] / g[
+        "cash_flow_operatingCashflow"
+    ].replace(0, np.nan)
+
+
+def feat_dividend_payout_ratio(g: pd.DataFrame) -> pd.Series:
+    """Dividend Payout Ratio = Dividends / Operating Cash Flow"""
+    return g["cash_flow_dividendPayout"] / g["cash_flow_operatingCashflow"].replace(
+        0, np.nan
+    )
+
+
+def feat_cash_conversion_ratio(g: pd.DataFrame) -> pd.Series:
+    """Cash Conversion Ratio = Operating Cash Flow / Net Income"""
+    return g["cash_flow_operatingCashflow"] / g["cash_flow_netIncome"].replace(
+        0, np.nan
+    )
+
+
+# --- 6. Earnings Enrichments ---
+def feat_earnings_beat(g: pd.DataFrame) -> pd.Series:
+    """Earnings Beat = 1 if reported EPS > estimated EPS, else 0"""
+    return (g["earnings_reportedEPS"] > g["earnings_estimatedEPS"]).astype(int)
+
+
+def feat_avg_surprise(g: pd.DataFrame, window: int) -> pd.Series:
+    """Rolling Average of Surprise Percentage"""
+    return g["earnings_surprisePercentage"].rolling(window, min_periods=1).mean()
+
+
+def feat_earnings_momentum(g: pd.DataFrame, window: int) -> pd.Series:
+    """Earnings Momentum = Rolling mean of surprise values"""
+    return g["earnings_surprise"].rolling(window, min_periods=1).mean()
+
+
+def feat_forecast_accuracy(g: pd.DataFrame) -> pd.Series:
+    """Forecast Accuracy = Absolute difference between estimated and reported EPS"""
+    return abs(g["earnings_estimatedEPS"] - g["earnings_reportedEPS"])
+
+
+# --- 7. Income Statement Enrichments ---
+def feat_gross_margin(g: pd.DataFrame) -> pd.Series:
+    """Gross Margin = Gross Profit / Total Revenue"""
+    return g["income_statement_grossProfit"] / g[
+        "income_statement_totalRevenue"
+    ].replace(0, np.nan)
+
+
+def feat_operating_margin(g: pd.DataFrame) -> pd.Series:
+    """Operating Margin = Operating Income / Total Revenue"""
+    return g["income_statement_operatingIncome"] / g[
+        "income_statement_totalRevenue"
+    ].replace(0, np.nan)
+
+
+def feat_net_margin(g: pd.DataFrame) -> pd.Series:
+    """Net Margin = Net Income / Total Revenue"""
+    return g["income_statement_netIncome"] / g["income_statement_totalRevenue"].replace(
+        0, np.nan
+    )
+
+
+def feat_ebitda_margin(g: pd.DataFrame) -> pd.Series:
+    """EBITDA Margin = EBITDA / Total Revenue"""
+    return g["income_statement_ebitda"] / g["income_statement_totalRevenue"].replace(
+        0, np.nan
+    )
+
+
+def feat_rd_intensity(g: pd.DataFrame) -> pd.Series:
+    """R&D Intensity = Research & Development / Total Revenue"""
+    return g["income_statement_researchAndDevelopment"] / g[
+        "income_statement_totalRevenue"
+    ].replace(0, np.nan)
+
+
+def feat_interest_coverage(g: pd.DataFrame) -> pd.Series:
+    """Interest Coverage = EBIT / Interest Expense"""
+    return g["income_statement_ebit"] / g["income_statement_interestExpense"].replace(
+        0, np.nan
+    )
+
+
 # dispatcher
 FEATURE_IMPLEMENTATIONS = {
+    # Stock data features
     "sma": feat_sma,
     "ema": feat_ema,
     "macd": feat_macd,
@@ -237,6 +405,36 @@ FEATURE_IMPLEMENTATIONS = {
     "rolling_min": feat_rolling_min,
     "zscore": feat_zscore,
     "session_flags": feat_session_flags,
+    # Generic helpers
+    "yoy_growth": feat_yoy_growth,
+    "qoq_growth": feat_qoq_growth,
+    "rolling_avg": feat_rolling_avg,
+    "pct_change": feat_pct_change,
+    # Balance sheet enrichments
+    "current_ratio": feat_current_ratio,
+    "quick_ratio": feat_quick_ratio,
+    "debt_to_equity": feat_debt_to_equity,
+    "debt_to_assets": feat_debt_to_assets,
+    "working_capital": feat_working_capital,
+    "equity_ratio": feat_equity_ratio,
+    # Cash flow enrichments
+    "free_cash_flow": feat_free_cash_flow,
+    "operating_cash_margin": feat_operating_cash_margin,
+    "capex_intensity": feat_capex_intensity,
+    "dividend_payout_ratio": feat_dividend_payout_ratio,
+    "cash_conversion_ratio": feat_cash_conversion_ratio,
+    # Earnings enrichments
+    "earnings_beat": feat_earnings_beat,
+    "avg_surprise": feat_avg_surprise,
+    "earnings_momentum": feat_earnings_momentum,
+    "forecast_accuracy": feat_forecast_accuracy,
+    # Income statement enrichments
+    "gross_margin": feat_gross_margin,
+    "operating_margin": feat_operating_margin,
+    "net_margin": feat_net_margin,
+    "ebitda_margin": feat_ebitda_margin,
+    "rd_intensity": feat_rd_intensity,
+    "interest_coverage": feat_interest_coverage,
 }
 
 
@@ -269,59 +467,78 @@ def apply_features(df: pd.DataFrame, dsl: dict, registry: dict) -> pd.DataFrame:
 
     all_new_cols = []
 
-    for request in dsl.get("features", []):
+    for idx, request in enumerate(dsl.get("features", [])):
         name: str = request["name"]
         final_params = request.get("params", {})
 
-        # Check if this is a custom feature
-        if name.startswith("custom_"):
-            # Execute custom code for each group
-            code = final_params["code"]
-            output_col_name = final_params["as"]
+        logger.debug(f"Processing feature {idx+1}/{len(dsl.get('features', []))}: '{name}' with params: {final_params}")
 
-            # TODO: check if we should groupby ticker
-            if has_ticker:
-                result_list = [
-                    _execute_custom_code(code, group_df)
-                    for _, group_df in df_enriched.groupby("ticker")
-                ]
-                full_result = pd.concat(result_list)
-            else:
-                # Apply to entire DataFrame if no ticker column
-                full_result = _execute_custom_code(code, df_enriched)
+        try:
+            # Check if this is a custom feature
+            if name.startswith("custom_"):
+                # Execute custom code for each group
+                code = final_params["code"]
+                output_col_name = final_params["as"]
 
-            all_new_cols.append(full_result.rename(output_col_name))
-        else:
-            # Use standard feature implementation
-            impl_func = FEATURE_IMPLEMENTATIONS.get(name)
+                logger.debug(f"Executing custom feature '{name}' with code:\n{code}")
 
-            # Direct Calculation per Group (or entire DataFrame if no ticker)
-            # TODO: check if we should groupby ticker
-            if has_ticker:
-                result_list = [
-                    impl_func(group_df, **final_params)
-                    for _, group_df in df_enriched.groupby("ticker")
-                ]
-                full_result = pd.concat(result_list)
-            else:
-                # Apply to entire DataFrame if no ticker column
-                full_result = impl_func(df_enriched, **final_params)
+                # TODO: check if we should groupby ticker
+                if has_ticker:
+                    result_list = [
+                        _execute_custom_code(code, group_df)
+                        for _, group_df in df_enriched.groupby("ticker")
+                    ]
+                    full_result = pd.concat(result_list)
+                else:
+                    # Apply to entire DataFrame if no ticker column
+                    full_result = _execute_custom_code(code, df_enriched)
 
-            # Assign Results
-            if isinstance(full_result, pd.DataFrame):
-                for col in full_result.columns:
-                    output_col_name = f"{name}_{col}"
-                    all_new_cols.append(
-                        full_result[[col]].rename(columns={col: output_col_name})
-                    )
-            else:
-                output_col_name = request.get(
-                    "as",
-                    f"{name}_{final_params.get('on', '')}_{final_params.get('window', '')}".rstrip(
-                        "_"
-                    ),
-                )
                 all_new_cols.append(full_result.rename(output_col_name))
+                logger.debug(f"Successfully applied custom feature '{name}' -> column '{output_col_name}'")
+            else:
+                # Use standard feature implementation
+                impl_func = FEATURE_IMPLEMENTATIONS.get(name)
+
+                if impl_func is None:
+                    logger.error(f"Feature '{name}' not found in FEATURE_IMPLEMENTATIONS")
+                    raise ValueError(f"Unknown feature: {name}")
+
+                # Direct Calculation per Group (or entire DataFrame if no ticker)
+                # TODO: check if we should groupby ticker
+                if has_ticker:
+                    result_list = [
+                        impl_func(group_df, **final_params)
+                        for _, group_df in df_enriched.groupby("ticker")
+                    ]
+                    full_result = pd.concat(result_list)
+                else:
+                    # Apply to entire DataFrame if no ticker column
+                    full_result = impl_func(df_enriched, **final_params)
+
+                # Assign Results
+                if isinstance(full_result, pd.DataFrame):
+                    for col in full_result.columns:
+                        output_col_name = f"{name}_{col}"
+                        all_new_cols.append(
+                            full_result[[col]].rename(columns={col: output_col_name})
+                        )
+                        logger.debug(f"Applied feature '{name}' -> column '{output_col_name}'")
+                else:
+                    output_col_name = request.get(
+                        "as",
+                        f"{name}_{final_params.get('on', '')}_{final_params.get('window', '')}".rstrip(
+                            "_"
+                        ),
+                    )
+                    all_new_cols.append(full_result.rename(output_col_name))
+                    logger.debug(f"Applied feature '{name}' -> column '{output_col_name}'")
+
+        except Exception as e:
+            logger.exception(f"Failed to apply feature '{name}' (feature {idx+1}/{len(dsl.get('features', []))})")
+            logger.error(f"Feature params: {final_params}")
+            logger.error(f"Available DataFrame columns: {list(df_enriched.columns)}")
+            logger.error(f"Feature request: {request}")
+            raise  # Re-raise to be caught by outer try-except
 
     # Combine original df with all new feature columns at once
     if all_new_cols:
@@ -372,8 +589,14 @@ def enrich_dataframe_from_keywords(
         user_keywords, allowed_features_prompt, available_columns
     )
 
+    # Log the LLM response for debugging
+    logger.info(f"LLM returned DSL recipe: {dsl_string}")
+
     # Validate and enrich DSL with defaults
     dsl, errors = validate_dsl(dsl_string, registry)
+
+    # Log the validated DSL
+    logger.debug(f"Validated DSL: {dsl}")
 
     metadata = {
         "dsl_string": dsl_string,
@@ -390,12 +613,16 @@ def enrich_dataframe_from_keywords(
 
     # Apply features
     try:
+        logger.debug(f"Applying {len(dsl.get('features', []))} features to DataFrame")
         df_enriched = apply_features(df, dsl, registry)
         metadata["success"] = True
+        logger.info(f"Successfully applied all features. New columns: {set(df_enriched.columns) - set(df.columns)}")
         return df_enriched, metadata
     except Exception as e:
         metadata["errors"].append(f"Feature application error: {str(e)}")
-        logger.error(f"Feature application failed: {e}")
+        logger.exception(f"Feature application failed with exception: {e}")
+        logger.error(f"Failed while processing DSL: {dsl}")
+        logger.error(f"Available DataFrame columns: {list(df.columns)}")
         return df, metadata
 
 

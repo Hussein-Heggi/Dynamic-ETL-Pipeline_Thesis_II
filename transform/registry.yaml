@@ -152,6 +152,100 @@ features:
     description: Creates multiple calendar/time-based features from the index.
     params: {}
 
+  # Generic Helper Functions (Work on Any Column)
+  yoy_growth:
+    description: Year-over-year percentage change (default periods=4 for quarterly data)
+    params:
+      "on": { type: string, required: true }
+      periods: { type: int, required: false, default: 4 }
+  qoq_growth:
+    description: Quarter-over-quarter percentage change
+    params:
+      "on": { type: string, required: true }
+  rolling_avg:
+    description: Rolling average over N periods
+    params:
+      "on": { type: string, required: true }
+      window: { type: int, required: true }
+  pct_change:
+    description: Percentage change over N periods
+    params:
+      "on": { type: string, required: true }
+      periods: { type: int, required: true }
+
+  # Balance Sheet Enrichments
+  current_ratio:
+    description: Current Ratio = Current Assets / Current Liabilities (liquidity measure)
+    params: {}
+  quick_ratio:
+    description: Quick Ratio = (Current Assets - Inventory) / Current Liabilities (acid test)
+    params: {}
+  debt_to_equity:
+    description: Debt-to-Equity Ratio = Total Debt / Total Shareholder Equity (leverage measure)
+    params: {}
+  debt_to_assets:
+    description: Debt-to-Assets Ratio = Total Debt / Total Assets (leverage measure)
+    params: {}
+  working_capital:
+    description: Working Capital = Current Assets - Current Liabilities (liquidity measure)
+    params: {}
+  equity_ratio:
+    description: Equity Ratio = Total Shareholder Equity / Total Assets (solvency measure)
+    params: {}
+
+  # Cash Flow Enrichments
+  free_cash_flow:
+    description: Free Cash Flow = Operating Cash Flow - Capital Expenditures
+    params: {}
+  operating_cash_margin:
+    description: Operating Cash Margin = Operating Cash Flow / Net Income (cash efficiency)
+    params: {}
+  capex_intensity:
+    description: CapEx Intensity = Capital Expenditures / Operating Cash Flow (investment ratio)
+    params: {}
+  dividend_payout_ratio:
+    description: Dividend Payout Ratio = Dividends / Operating Cash Flow (shareholder returns)
+    params: {}
+  cash_conversion_ratio:
+    description: Cash Conversion Ratio = Operating Cash Flow / Net Income (earnings quality)
+    params: {}
+
+  # Earnings Enrichments
+  earnings_beat:
+    description: Earnings Beat = 1 if reported EPS > estimated EPS, else 0 (binary flag)
+    params: {}
+  avg_surprise:
+    description: Rolling average of earnings surprise percentage
+    params:
+      window: { type: int, required: true }
+  earnings_momentum:
+    description: Rolling mean of earnings surprise values (trend indicator)
+    params:
+      window: { type: int, required: true }
+  forecast_accuracy:
+    description: Absolute difference between estimated and reported EPS (forecast error)
+    params: {}
+
+  # Income Statement Enrichments
+  gross_margin:
+    description: Gross Margin = Gross Profit / Total Revenue (profitability measure)
+    params: {}
+  operating_margin:
+    description: Operating Margin = Operating Income / Total Revenue (operational efficiency)
+    params: {}
+  net_margin:
+    description: Net Margin = Net Income / Total Revenue (bottom-line profitability)
+    params: {}
+  ebitda_margin:
+    description: EBITDA Margin = EBITDA / Total Revenue (cash profitability)
+    params: {}
+  rd_intensity:
+    description: R&D Intensity = Research & Development / Total Revenue (innovation investment)
+    params: {}
+  interest_coverage:
+    description: Interest Coverage = EBIT / Interest Expense (debt service ability)
+    params: {}
+
   #  Custom/Lambda Features
   # NOTE: 'custom_' is a PREFIX pattern, not a feature name itself.
   # Any feature with name starting with 'custom_' (e.g., 'custom_price_ratio', 'custom_my_indicator')

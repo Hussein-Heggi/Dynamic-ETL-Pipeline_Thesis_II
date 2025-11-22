@@ -1,0 +1,1 @@
+- [ ] LLM requesting an enrichment that the user requested but for which the required columns are not in the dataframe. This can happen because the LLM is not aware of which enrichments require which features to be present in the dataframe.
