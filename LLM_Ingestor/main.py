@@ -12,7 +12,7 @@ def main():
     
     # Configuration
     config = {
-
+        
     }
     
     print("Initializing Financial Data Ingestor...")
@@ -58,7 +58,8 @@ def main():
 
         # Economic indicator with multi-column output
       #  "Show recent US Treasury yield curve data",
-      "Compare US inflation with AAPL's monthly adjusted returns over the last 10 years. I want datasets for both"
+     # "Compare US inflation with AAPL's monthly adjusted returns over the last 10 years. I want datasets for both"
+     "i want the income statement for coca cola yearly."
     ]
     
     print("=" * 80)
@@ -122,7 +123,7 @@ def main():
                 print(f"    Shape: {df.shape}")
                 print(f"    Columns: {list(df.columns)}")
                 print("\n    First 5 rows:")
-                print(df.head())
+                print(df.to_string())
         
         except Exception as e:
             print(f"\n❌ Error processing query: {e}")

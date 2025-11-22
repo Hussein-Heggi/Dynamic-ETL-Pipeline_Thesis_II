@@ -226,11 +226,18 @@ Behavior:
 - Alpha Vantage: Has fundamental endpoints (when available in manifest)
 - Polygon: Use ONLY for price context via get_aggs (NOT for financial statements)
 
+IMPORTANT - Period Parameter for Financial Statements:
+- Financial statement endpoints (INCOME_STATEMENT, BALANCE_SHEET, CASH_FLOW, EARNINGS) have a "period" parameter
+- Valid values: "quarterly" (default) or "annual"
+- Default behavior: Use "quarterly" unless user explicitly requests annual/yearly data
+- User indicators for annual: "annual", "yearly", "year", "annually"
+- User indicators for quarterly: "quarterly", "quarter", "Q1", "Q2", etc. (or no specification)
+
 4.3.a Vague fundamentals WITH ticker
 Examples: "IBM fundamentals", "fundamentals for AAPL"
 
 Behavior:
-- Alpha Vantage: Return fundamental endpoints if available
+- Alpha Vantage: Return fundamental endpoints if available (with period="quarterly")
 - Polygon: Add get_aggs (1-month daily) for price context
 
 4.3.b Vague fundamentals WITHOUT ticker
@@ -242,10 +249,11 @@ Behavior:
 - For EACH: fundamental endpoints + Polygon get_aggs
 
 4.3.c Specific fundamental statement queries
-Examples: "IBM income statement", "cash flow for AAPL"
+Examples: "IBM income statement", "cash flow for AAPL", "MSFT annual earnings"
 
 Behavior:
 - Alpha Vantage: Use specific statement endpoint only
+- Set period="quarterly" by default, or period="annual" if user requests annual/yearly data
 - Polygon: Optionally add get_aggs for price context
 
 ========================================
@@ -501,6 +509,40 @@ User: "Compare AAPL and MSFT daily data"
   ]
 }}
 
+Example 10 – Financial statement (quarterly default):
+User: "Show me AAPL income statement"
+{{
+  "proceed": true,
+  "features": {{ "enrichment": [] }},
+  "semantic_keywords": ["fundamentals", "income_statement", "quarterly", "financial"],
+  "tickers": ["AAPL"],
+  "api_requests": [
+    {{
+      "api_name": "alpha_vantage",
+      "endpoint_name": "INCOME_STATEMENT",
+      "parameters": {{ "symbol": "AAPL", "period": "quarterly" }},
+      "reasoning": "Alpha Vantage income statement with quarterly period (default)"
+    }}
+  ]
+}}
+
+Example 11 – Financial statement (annual requested):
+User: "Get Microsoft annual earnings report"
+{{
+  "proceed": true,
+  "features": {{ "enrichment": [] }},
+  "semantic_keywords": ["fundamentals", "earnings", "annual", "financial"],
+  "tickers": ["MSFT"],
+  "api_requests": [
+    {{
+      "api_name": "alpha_vantage",
+      "endpoint_name": "EARNINGS",
+      "parameters": {{ "symbol": "MSFT", "period": "annual" }},
+      "reasoning": "User requested annual earnings, set period to annual"
+    }}
+  ]
+}}
+
 IMPORTANT:
 - Always output valid JSON
 - Only use endpoints from the manifest
@@ -509,6 +551,7 @@ IMPORTANT:
 - Include parameters in enrichment feature names (SMA_20, not SMA)
 - Infer tickers from company names when applicable
 - Always use BOTH APIs for stock time-series when both support it
+- For financial statements, default to period="quarterly" unless user explicitly requests annual/yearly
 """
     
     def _parse_llm_response(self, data: dict) -> LLMResponse:

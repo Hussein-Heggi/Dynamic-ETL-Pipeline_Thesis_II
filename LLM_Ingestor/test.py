@@ -741,7 +741,7 @@ def main():
     parser = argparse.ArgumentParser(description="LLM routing + spec test harness")
     parser.add_argument("--api-key", help="OpenAI API key")
     parser.add_argument("--model", default="gpt-5-nano", help="Model name for QueryAnalyzer")
-    parser.add_argument("--csv-path", default="llm_routing_test_results.csv", help="Output CSV path")
+    parser.add_argument("--csv-path", default="llm_routing_test_results2.csv", help="Output CSV path")
     args = parser.parse_args()
 
     run_all_tests(api_key='', model=args.model, csv_path=args.csv_path)

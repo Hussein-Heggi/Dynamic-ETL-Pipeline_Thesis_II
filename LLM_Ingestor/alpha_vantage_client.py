@@ -435,67 +435,125 @@ class AlphaVantageClient(BaseAPIClient):
     def _parse_fundamental_statement(self, data: Dict[str, Any], features: Dict[str, Any]) -> pd.DataFrame:
         """Parse annual and quarterly fundamental statements (income, balance sheet, cash flow)"""
         symbol = data.get('symbol') or features.get('ticker') or features.get('symbol')
-        frames: List[pd.DataFrame] = []
-        # Each statement has annualReports and quarterlyReports lists
-        for key, period_label in [('annualReports', 'annual'), ('quarterlyReports', 'quarterly')]:
-            reports = data.get(key)
-            if isinstance(reports, list) and reports:
-                df = pd.DataFrame(reports)
-                # Add a period indicator
-                df['period'] = period_label
-                # Rename fiscalDateEnding to timestamp
-                if 'fiscalDateEnding' in df.columns:
-                    df = df.rename(columns={'fiscalDateEnding': 'timestamp'})
-                    df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce').dt.date
-                # Convert numeric-like columns to numeric where possible
-                for col in df.columns:
-                    if col not in ['timestamp', 'period', 'reportedCurrency']:
-                        df[col] = pd.to_numeric(df[col], errors='coerce')
-                frames.append(df)
-        if not frames:
+        function_name = features.get('function', '')
+        
+        # Determine which period to use (quarterly is default)
+        period = features.get('period', 'quarterly').lower()
+        
+        # Map period to the correct data key
+        if period == 'annual':
+            key = 'annualReports'
+            period_label = 'annual'
+        else:  # Default to quarterly
+            key = 'quarterlyReports'
+            period_label = 'quarterly'
+        
+        # Extract the appropriate reports
+        reports = data.get(key)
+        if not isinstance(reports, list) or not reports:
             return pd.DataFrame()
-        combined = pd.concat(frames, ignore_index=True, sort=False)
+        
+        df = pd.DataFrame(reports)
+        
+        # Add column prefix based on statement type
+        prefix = self._get_statement_prefix(function_name)
+        if prefix:
+            # Rename all columns except metadata columns
+            metadata_cols = ['fiscalDateEnding', 'reportedCurrency']
+            cols_to_rename = [col for col in df.columns if col not in metadata_cols]
+            rename_map = {col: f"{prefix}_{col}" for col in cols_to_rename}
+            df = df.rename(columns=rename_map)
+        
+        # Add a period indicator
+        df['period'] = period_label
+        
+        # Rename fiscalDateEnding to timestamp
+        if 'fiscalDateEnding' in df.columns:
+            df = df.rename(columns={'fiscalDateEnding': 'timestamp'})
+            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce').dt.date
+        
+        # Convert numeric-like columns to numeric where possible
+        for col in df.columns:
+            if col not in ['timestamp', 'period', 'reportedCurrency', 'ticker']:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
         # Include ticker column if available
         if symbol:
-            combined.insert(0, 'ticker', symbol)
+            df.insert(0, 'ticker', symbol)
+        
         # Sort by timestamp if present
-        if 'timestamp' in combined.columns:
-            combined = combined.sort_values(['timestamp', 'period'])
-            combined.reset_index(drop=True, inplace=True)
-        return combined
+        if 'timestamp' in df.columns:
+            df = df.sort_values('timestamp')
+            df.reset_index(drop=True, inplace=True)
+        
+        return df
+    
+    def _get_statement_prefix(self, function_name: str) -> str:
+        """Get the column prefix for a financial statement type"""
+        prefix_map = {
+            'INCOME_STATEMENT': 'income_statement',
+            'BALANCE_SHEET': 'balance_sheet',
+            'CASH_FLOW': 'cash_flow',
+            'EARNINGS': 'earnings'
+        }
+        return prefix_map.get(function_name, '')
 
     def _parse_earnings_response(self, data: Dict[str, Any], features: Dict[str, Any]) -> pd.DataFrame:
         """Parse earnings history (EPS) with analyst estimates and surprise metrics"""
         symbol = data.get('symbol') or features.get('ticker') or features.get('symbol')
-        frames: List[pd.DataFrame] = []
-        for key, period_label in [('annualEarnings', 'annual'), ('quarterlyEarnings', 'quarterly')]:
-            items = data.get(key)
-            if isinstance(items, list) and items:
-                df = pd.DataFrame(items)
-                df['period'] = period_label
-                # Rename fiscalDateEnding to timestamp
-                if 'fiscalDateEnding' in df.columns:
-                    df = df.rename(columns={'fiscalDateEnding': 'timestamp'})
-                    df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce').dt.date
-                # Rename reportedDate to reported_timestamp as date
-                if 'reportedDate' in df.columns:
-                    df['reportedDate'] = pd.to_datetime(df['reportedDate'], errors='coerce').dt.date
-                # Convert numeric columns (reportedEPS, estimatedEPS, surprise, surprisePercentage)
-                numeric_cols = ['reportedEPS', 'estimatedEPS', 'surprise', 'surprisePercentage']
-                for col in numeric_cols:
-                    if col in df.columns:
-                        df[col] = pd.to_numeric(df[col], errors='coerce')
-                frames.append(df)
-        if not frames:
+        
+        # Determine which period to use (quarterly is default)
+        period = features.get('period', 'quarterly').lower()
+        
+        # Map period to the correct data key
+        if period == 'annual':
+            key = 'annualEarnings'
+            period_label = 'annual'
+        else:  # Default to quarterly
+            key = 'quarterlyEarnings'
+            period_label = 'quarterly'
+        
+        # Extract the appropriate earnings data
+        items = data.get(key)
+        if not isinstance(items, list) or not items:
             return pd.DataFrame()
-        combined = pd.concat(frames, ignore_index=True, sort=False)
+        
+        df = pd.DataFrame(items)
+        
+        # Add column prefix for earnings
+        prefix = 'earnings'
+        metadata_cols = ['fiscalDateEnding', 'reportedDate']
+        cols_to_rename = [col for col in df.columns if col not in metadata_cols]
+        rename_map = {col: f"{prefix}_{col}" for col in cols_to_rename}
+        df = df.rename(columns=rename_map)
+        
+        # Add period indicator
+        df['period'] = period_label
+        
+        # Rename fiscalDateEnding to timestamp
+        if 'fiscalDateEnding' in df.columns:
+            df = df.rename(columns={'fiscalDateEnding': 'timestamp'})
+            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce').dt.date
+        
+        # Rename reportedDate to reported_timestamp as date
+        if 'reportedDate' in df.columns:
+            df['reportedDate'] = pd.to_datetime(df['reportedDate'], errors='coerce').dt.date
+        
+        # Convert numeric columns
+        for col in df.columns:
+            if col not in ['timestamp', 'reportedDate', 'period', 'ticker']:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Include ticker column if available
         if symbol:
-            combined.insert(0, 'ticker', symbol)
+            df.insert(0, 'ticker', symbol)
+        
         # Sort by timestamp if available
-        if 'timestamp' in combined.columns:
-            combined = combined.sort_values(['timestamp', 'period'])
-            combined.reset_index(drop=True, inplace=True)
-        return combined
+        if 'timestamp' in df.columns:
+            df = df.sort_values('timestamp')
+            df.reset_index(drop=True, inplace=True)
+        
+        return df
 
     def _parse_earnings_estimates_response(self, data: Dict[str, Any], features: Dict[str, Any]) -> pd.DataFrame:
         """Parse earnings estimates response which may contain multiple lists"""

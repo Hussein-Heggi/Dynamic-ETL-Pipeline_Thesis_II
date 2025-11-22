@@ -1118,6 +1118,14 @@ def build_alpha_vantage_api() -> APISpec:
                         description="Stock ticker symbol",
                         aliases=["ticker", "stock"]
                     ),
+                    ParameterSchema(
+                        name="period",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Reporting period frequency",
+                        valid_values=["quarterly", "annual"],
+                        default_value="quarterly"
+                    ),
                 ],
                 parameter_mappings={
                     "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
@@ -1138,6 +1146,14 @@ def build_alpha_vantage_api() -> APISpec:
                         description="Stock ticker symbol",
                         aliases=["ticker", "stock"]
                     ),
+                    ParameterSchema(
+                        name="period",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Reporting period frequency",
+                        valid_values=["quarterly", "annual"],
+                        default_value="quarterly"
+                    ),
                 ],
                 parameter_mappings={
                     "symbol": ParameterMapping(source="extracted_entities.tickers[0]")
@@ -1157,6 +1173,14 @@ def build_alpha_vantage_api() -> APISpec:
                         required=True,
                         description="Stock ticker symbol",
                         aliases=["ticker", "stock"]
+                    ),
+                    ParameterSchema(
+                        name="period",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Reporting period frequency",
+                        valid_values=["quarterly", "annual"],
+                        default_value="quarterly"
                     ),
                 ],
                 parameter_mappings={
@@ -1205,6 +1229,14 @@ def build_alpha_vantage_api() -> APISpec:
                         required=True,
                         description="Stock ticker symbol",
                         aliases=["ticker", "stock"]
+                    ),
+                    ParameterSchema(
+                        name="period",
+                        type=ParameterType.ENUM,
+                        required=False,
+                        description="Reporting period frequency",
+                        valid_values=["quarterly", "annual"],
+                        default_value="quarterly"
                     ),
                 ],
                 parameter_mappings={
